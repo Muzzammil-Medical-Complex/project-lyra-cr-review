@@ -555,4 +555,3 @@ class ProactiveManager:
                 base_score *= (hours_since_last / 12)
 
         return max(0.0, min(1.0, base_score))
-```
