@@ -159,7 +159,7 @@ class AppraisalEngine:
             explanation=explanation
         )
 
-    def _appraise_goal_outcome(self, message: str) -> tuple[PADState, float, str]:
+    def _appraise_goal_outcome(self, message: str) -> tuple:
         """Appraise goal-related outcomes in user message"""
         # Goal achievement keywords
         achievement_patterns = [
@@ -191,7 +191,7 @@ class AppraisalEngine:
         
         return (PADState(pleasure=0.0, arousal=0.0, dominance=0.0), 0.0, "")
 
-    def _appraise_agent_action(self, message: str) -> tuple[PADState, float, str]:
+    def _appraise_agent_action(self, message: str) -> tuple:
         """Appraise user actions toward the companion (praise, criticism, etc.)"""
         # Praise patterns (user complimenting the companion)
         praise_patterns = [
@@ -238,7 +238,7 @@ class AppraisalEngine:
         
         return (PADState(pleasure=0.0, arousal=0.0, dominance=0.0), 0.0, "")
 
-    def _appraise_event_affect(self, message: str) -> tuple[PADState, float, str]:
+    def _appraise_event_affect(self, message: str) -> tuple:
         """Appraise general emotional content in user message"""
         positive_count = sum(1 for word in self.positive_keywords if word in message)
         negative_count = sum(1 for word in self.negative_keywords if word in message)
@@ -265,7 +265,7 @@ class AppraisalEngine:
         
         return (PADState(pleasure=0.0, arousal=0.0, dominance=0.0), 0.0, "")
 
-    def _appraise_object_attitude(self, message: str) -> tuple[PADState, float, str]:
+    def _appraise_object_attitude(self, message: str) -> tuple:
         """Appraise user's attitude toward objects/topics"""
         # Like/dislike expressions
         like_patterns = [
