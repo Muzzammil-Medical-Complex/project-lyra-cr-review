@@ -63,10 +63,10 @@ class PersonalityEngine:
             
             # Create initial personality state record
             query = """
-                INSERT INTO personality_state 
+                INSERT INTO personality_state
                 (user_id, openness, conscientiousness, extraversion, agreeableness, neuroticism,
                  pleasure, arousal, dominance, emotion_label, pad_baseline)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
                 RETURNING id
             """
             
@@ -95,7 +95,7 @@ class PersonalityEngine:
             state_id = result[0]['id']
             await self.db.execute_user_query(
                 user_id,
-                "UPDATE personality_state SET is_current = TRUE WHERE id = %s",
+                "UPDATE personality_state SET is_current = TRUE WHERE id = $1",
                 (state_id,)
             )
             
@@ -142,9 +142,9 @@ class PersonalityEngine:
         
         for quirk in default_quirks:
             query = """
-                INSERT INTO quirks 
+                INSERT INTO quirks
                 (user_id, name, category, description, strength, confidence)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                VALUES ($1, $2, $3, $4, $5, $6)
             """
             params = (
                 user_id,
@@ -198,9 +198,9 @@ class PersonalityEngine:
         
         for need in default_needs:
             query = """
-                INSERT INTO needs 
+                INSERT INTO needs
                 (user_id, need_type, current_level, baseline_level, decay_rate)
-                VALUES (%s, %s, %s, %s, %s)
+                VALUES ($1, $2, $3, $4, $5)
             """
             params = (
                 user_id,
@@ -223,8 +223,8 @@ class PersonalityEngine:
         """
         query = """
             SELECT pleasure, arousal, dominance, emotion_label, pad_baseline
-            FROM personality_state 
-            WHERE user_id = %s AND is_current = TRUE
+            FROM personality_state
+            WHERE user_id = $1 AND is_current = TRUE
             LIMIT 1
         """
         
@@ -260,8 +260,8 @@ class PersonalityEngine:
             personality_query = """
                 SELECT openness, conscientiousness, extraversion, agreeableness, neuroticism,
                        pleasure, arousal, dominance, emotion_label, pad_baseline
-                FROM personality_state 
-                WHERE user_id = %s AND is_current = TRUE
+                FROM personality_state
+                WHERE user_id = $1 AND is_current = TRUE
                 LIMIT 1
             """
             
@@ -277,8 +277,8 @@ class PersonalityEngine:
             # Get active quirks
             quirks_query = """
                 SELECT id, name, category, description, strength, confidence
-                FROM quirks 
-                WHERE user_id = %s AND is_active = TRUE
+                FROM quirks
+                WHERE user_id = $1 AND is_active = TRUE
             """
             
             quirks_result = await self.db.execute_user_query(
@@ -302,8 +302,8 @@ class PersonalityEngine:
             needs_query = """
                 SELECT need_type, current_level, baseline_level, decay_rate,
                        last_satisfied, trigger_threshold, satisfaction_rate
-                FROM needs 
-                WHERE user_id = %s
+                FROM needs
+                WHERE user_id = $1
             """
             
             needs_result = await self.db.execute_user_query(
@@ -382,18 +382,18 @@ class PersonalityEngine:
             
             # Archive current state
             archive_query = """
-                UPDATE personality_state 
-                SET is_current = FALSE 
-                WHERE user_id = %s AND is_current = TRUE
+                UPDATE personality_state
+                SET is_current = FALSE
+                WHERE user_id = $1 AND is_current = TRUE
             """
             await self.db.execute_user_query(user_id, archive_query, (user_id,))
             
             # Insert new state
             insert_query = """
-                INSERT INTO personality_state 
+                INSERT INTO personality_state
                 (user_id, openness, conscientiousness, extraversion, agreeableness, neuroticism,
                  pleasure, arousal, dominance, emotion_label, pad_baseline, is_current)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, TRUE)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, TRUE)
                 RETURNING id
             """
             
@@ -456,8 +456,8 @@ class PersonalityEngine:
             # Get all user interactions from last 7 days
             interactions_query = """
                 SELECT pad_after
-                FROM interactions 
-                WHERE user_id = %s AND timestamp >= NOW() - INTERVAL '7 days'
+                FROM interactions
+                WHERE user_id = $1 AND timestamp >= NOW() - INTERVAL '7 days'
             """
             
             interactions_result = await self.db.execute_user_query(
@@ -493,9 +493,9 @@ class PersonalityEngine:
             
             # Update personality state with new baseline
             update_query = """
-                UPDATE personality_state 
-                SET pad_baseline = %s 
-                WHERE user_id = %s AND is_current = TRUE
+                UPDATE personality_state
+                SET pad_baseline = $1
+                WHERE user_id = $2 AND is_current = TRUE
             """
             
             update_params = (
@@ -531,8 +531,8 @@ class PersonalityEngine:
         try:
             # Get current quirk strength
             query = """
-                SELECT strength FROM quirks 
-                WHERE user_id = %s AND name = %s AND is_active = TRUE
+                SELECT strength FROM quirks
+                WHERE user_id = $1 AND name = $2 AND is_active = TRUE
                 LIMIT 1
             """
             
@@ -545,9 +545,9 @@ class PersonalityEngine:
             
             # Update quirk strength
             update_query = """
-                UPDATE quirks 
-                SET strength = %s, last_reinforced = NOW()
-                WHERE user_id = %s AND name = %s
+                UPDATE quirks
+                SET strength = $1, last_reinforced = NOW()
+                WHERE user_id = $2 AND name = $3
             """
             
             update_params = (new_strength, user_id, quirk_name)
@@ -573,10 +573,10 @@ class PersonalityEngine:
         """
         try:
             update_query = """
-                UPDATE needs 
-                SET current_level = GREATEST(0.0, LEAST(1.0, current_level + %s)),
+                UPDATE needs
+                SET current_level = GREATEST(0.0, LEAST(1.0, current_level + $1)),
                     last_updated = NOW()
-                WHERE user_id = %s AND need_type = %s
+                WHERE user_id = $2 AND need_type = $3
             """
             
             update_params = (level_delta, user_id, need_type)

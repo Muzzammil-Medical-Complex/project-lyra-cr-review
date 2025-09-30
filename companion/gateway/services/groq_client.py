@@ -7,6 +7,7 @@ like scoring and security analysis.
 
 import httpx
 import asyncio
+import json
 import logging
 from typing import List, Dict, Any, Optional
 from ..utils.exceptions import ServiceUnavailableError
@@ -176,7 +177,52 @@ class GroqClient:
             "confidence": 0.0,
             "reasoning": "No threat detected"
         }
-    
+
+    async def health_check(self) -> bool:
+        """
+        Check if the Groq API is accessible and responding.
+
+        Returns:
+            True if API is healthy, False otherwise
+        """
+        try:
+            # Make a minimal API call to test connectivity
+            response = await self.client.post(
+                f"{self.base_url}/chat/completions",
+                json={
+                    "model": self.model,
+                    "messages": [{"role": "user", "content": "test"}],
+                    "max_tokens": 1,
+                    "temperature": 0.0
+                }
+            )
+            return response.status_code == 200
+        except Exception as e:
+            self.logger.error(f"Groq health check failed: {e}")
+            return False
+
+    async def analyze_json_response(self, prompt: str, max_tokens: int = 1024, temperature: float = 0.2) -> Dict[str, Any]:
+        """
+        Executes a prompt that is expected to return a JSON object and parses it.
+        Includes retry logic for parsing errors.
+        """
+        for attempt in range(2): # Try up to 2 times
+            try:
+                response_text = await self.chat_completion(
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=max_tokens,
+                    temperature=temperature
+                )
+                # Clean the response to ensure it's valid JSON
+                clean_response = response_text.strip().replace("```json", "").replace("```", "").strip()
+                return json.loads(clean_response)
+            except (json.JSONDecodeError, KeyError) as e:
+                self.logger.warning(f"Failed to parse JSON response on attempt {attempt + 1}: {e}. Response: {response_text[:200]}")
+                if attempt == 1:
+                    raise ServiceUnavailableError("GroqClient", "Failed to get valid JSON response after multiple attempts.")
+                await asyncio.sleep(1) # Wait before retrying
+        return {} # Should not be reached
+
     async def close(self):
         """
         Close the HTTP client connection.

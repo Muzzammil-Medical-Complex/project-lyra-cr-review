@@ -165,7 +165,30 @@ class ChutesClient:
         except Exception as e:
             self.logger.error(f"Error fetching available models: {e}")
             return [self.primary_model, self.fallback_model]
-    
+
+    async def health_check(self) -> bool:
+        """
+        Check if the Chutes API is accessible and responding.
+
+        Returns:
+            True if API is healthy, False otherwise
+        """
+        try:
+            # Make a minimal API call to test connectivity
+            response = await self.client.post(
+                f"{self.base_url}/chat/completions",
+                json={
+                    "model": self.primary_model,
+                    "messages": [{"role": "user", "content": "test"}],
+                    "max_tokens": 1,
+                    "temperature": 0.0
+                }
+            )
+            return response.status_code == 200
+        except Exception as e:
+            self.logger.error(f"Chutes health check failed: {e}")
+            return False
+
     async def close(self):
         """
         Close the HTTP client connection.

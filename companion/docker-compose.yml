@@ -1,0 +1,196 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database with pgvector extension
+  postgres:
+    image: ankane/pgvector:latest
+    container_name: companion_postgres
+    environment:
+      POSTGRES_DB: companion_db
+      POSTGRES_USER: companion
+      POSTGRES_PASSWORD: companion_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/migrations:/migrations
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U companion -d companion_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Qdrant Vector Database
+  qdrant:
+    image: qdrant/qdrant:v1.12.1
+    container_name: companion_qdrant
+    volumes:
+      - qdrant_data:/qdrant/storage
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Redis Cache
+  redis:
+    image: redis:7.4.7-alpine
+    container_name: companion_redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+
+  # Letta Framework Service
+  letta:
+    image: letta/letta-server:0.6.8
+    container_name: companion_letta
+    environment:
+      - LETTA_SERVER_PORT=8283
+      - LETTA_SERVER_HOST=0.0.0.0
+    volumes:
+      - letta_data:/app/data
+    ports:
+      - "8283:8283"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8283/v1/config"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - redis
+
+  # Embedding Service (Gemini API wrapper)
+  embedding_service:
+    build:
+      context: ./embedding_service
+      dockerfile: Dockerfile
+    container_name: companion_embedding_service
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - REDIS_URL=${REDIS_URL}
+      - EMBEDDING_SERVICE_HOST=${EMBEDDING_SERVICE_HOST}
+      - EMBEDDING_SERVICE_PORT=${EMBEDDING_SERVICE_PORT}
+      - ENVIRONMENT=${ENVIRONMENT}
+    volumes:
+      - ./embedding_service:/app
+    ports:
+      - "${EMBEDDING_SERVICE_PORT}:${EMBEDDING_SERVICE_PORT}"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${EMBEDDING_SERVICE_PORT}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    depends_on:
+      - redis
+
+  # Gateway API (Main service)
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+    container_name: companion_gateway
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - QDRANT_URL=${QDRANT_URL}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - CHUTES_API_KEY=${CHUTES_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - LETTA_SERVER_URL=${LETTA_SERVER_URL}
+      - GATEWAY_HOST=${GATEWAY_HOST}
+      - GATEWAY_PORT=${GATEWAY_PORT}
+      - PRIMARY_LLM_MODEL=${PRIMARY_LLM_MODEL}
+      - FALLBACK_LLM_MODEL=${FALLBACK_LLM_MODEL}
+      - SCORING_LLM_MODEL=${SCORING_LLM_MODEL}
+      - EMBEDDING_DIMENSIONS=${EMBEDDING_DIMENSIONS}
+      - PAD_DRIFT_RATE=${PAD_DRIFT_RATE}
+      - QUIRK_DECAY_RATE=${QUIRK_DECAY_RATE}
+      - QUIRK_REINFORCEMENT_RATE=${QUIRK_REINFORCEMENT_RATE}
+      - SECURITY_CONFIDENCE_THRESHOLD=${SECURITY_CONFIDENCE_THRESHOLD}
+      - SECURITY_OFFENSE_WINDOW_DAYS=${SECURITY_OFFENSE_WINDOW_DAYS}
+      - MAX_PROACTIVE_PER_DAY=${MAX_PROACTIVE_PER_DAY}
+      - DB_POOL_MIN_SIZE=${DB_POOL_MIN_SIZE}
+      - DB_POOL_MAX_SIZE=${DB_POOL_MAX_SIZE}
+      - REDIS_POOL_SIZE=${REDIS_POOL_SIZE}
+      - MAX_REFLECTION_BATCH_SIZE=${MAX_REFLECTION_BATCH_SIZE}
+      - MAX_CONCURRENT_AI_CALLS=${MAX_CONCURRENT_AI_CALLS}
+      - ENVIRONMENT=${ENVIRONMENT}
+      - LOG_LEVEL=${LOG_LEVEL}
+    volumes:
+      - ./gateway:/app
+    ports:
+      - "${GATEWAY_PORT}:${GATEWAY_PORT}"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${GATEWAY_PORT}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      letta:
+        condition: service_healthy
+      embedding_service:
+        condition: service_healthy
+
+  # Discord Bot
+  discord_bot:
+    build:
+      context: ./discord_bot
+      dockerfile: Dockerfile
+    container_name: companion_discord_bot
+    environment:
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+      - GATEWAY_URL=http://gateway:${GATEWAY_PORT}
+      - DISCORD_BOT_PORT=${DISCORD_BOT_PORT}
+      - ENVIRONMENT=${ENVIRONMENT}
+      - LOG_LEVEL=${LOG_LEVEL}
+    volumes:
+      - ./discord_bot:/app
+    restart: unless-stopped
+    depends_on:
+      - gateway
+
+  # Caddy Reverse Proxy
+  caddy:
+    image: caddy:2-alpine
+    container_name: companion_caddy
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - gateway
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  qdrant_data:
+  redis_data:
+  letta_data:
+  caddy_data:
+  caddy_config:
