@@ -15,19 +15,6 @@ from ..models.personality import (
 from ..models.interaction import InteractionRecord
 
 
-class MemoryTheme:
-    """Represents a thematic cluster of related memories"""
-    def __init__(self, theme_name: str, description: str, confidence: float, 
-                 related_memories: List[Memory], temporal_span: timedelta, 
-                 importance_score: float):
-        self.theme_name = theme_name
-        self.description = description
-        self.confidence = confidence
-        self.related_memories = related_memories
-        self.temporal_span = temporal_span
-        self.importance_score = importance_score
-
-
 class BehavioralAnalysis:
     """Analysis of behavioral changes over a reflection period"""
     def __init__(self, user_id: str, status: str = "normal", **kwargs):
@@ -262,13 +249,13 @@ class ReflectionAgent:
         # Consolidate each theme into semantic memories
         consolidated_memories = []
         for theme in memory_themes:
-            if len(theme.related_memories) >= 3:  # Minimum for consolidation
+            if len(theme._related_memories) >= 3:  # Minimum for consolidation
                 try:
                     semantic_memory = await self._consolidate_theme_to_semantic(user_id, theme)
                     consolidated_memories.append(semantic_memory)
 
                     # Mark source memories as consolidated
-                    for memory in theme.related_memories:
+                    for memory in theme._related_memories:
                         await self.db.mark_memory_consolidated(user_id, memory.id, semantic_memory.id)
 
                 except Exception as e:
@@ -323,15 +310,18 @@ class ReflectionAgent:
         for theme_data in thematic_analysis_data.get("identified_themes", []):
             # Map memories to theme
             theme_memories = [memories[i] for i in theme_data.get("memory_indices", []) if i < len(memories)]
-            
+            temporal_span = self._calculate_temporal_span(theme_memories)
+
             theme = MemoryTheme(
                 theme_name=theme_data.get("theme_name"),
                 description=theme_data.get("description"),
                 confidence=theme_data.get("confidence"),
-                related_memories=theme_memories,
-                temporal_span=self._calculate_temporal_span(theme_memories),
+                related_memory_ids=[m.id for m in theme_memories],
+                temporal_span_hours=temporal_span.total_seconds() / 3600,
                 importance_score=theme_data.get("importance_score")
             )
+            # Store the actual memory objects for later use (not in the Pydantic model)
+            theme._related_memories = theme_memories
             themes.append(theme)
 
         # Sort themes by importance and confidence
@@ -360,11 +350,11 @@ class ReflectionAgent:
 
         Theme Description: {theme.description}
         Related Memories:
-        {chr(10).join([f'- {m.content}' for m in theme.related_memories])}
+        {chr(10).join([f'- {m.content}' for m in theme._related_memories])}
 
         Respond with ONLY the consolidated semantic memory content as a single string.
         """
-        
+
         consolidated_content = await self.groq.chat_completion(
             messages=[{"role": "user", "content": prompt}],
             max_tokens=300,
@@ -372,8 +362,8 @@ class ReflectionAgent:
         )
 
         # Calculate consolidated importance score
-        total_importance = sum(m.importance_score for m in theme.related_memories)
-        avg_importance = total_importance / len(theme.related_memories)
+        total_importance = sum(m.importance_score for m in theme._related_memories)
+        avg_importance = total_importance / len(theme._related_memories)
         # Boost importance for consolidated memories
         final_importance = min(1.0, avg_importance * 1.3)
 
@@ -385,9 +375,9 @@ class ReflectionAgent:
             importance_score=final_importance,
             metadata={
                 "source_theme": theme.theme_name,
-                "source_memory_count": len(theme.related_memories),
+                "source_memory_count": len(theme._related_memories),
                 "consolidation_date": datetime.utcnow().isoformat(),
-                "temporal_span_days": theme.temporal_span.days
+                "temporal_span_days": theme.temporal_span_hours / 24
             }
         )
 
@@ -395,7 +385,7 @@ class ReflectionAgent:
 
     def _build_theme_consolidation_prompt(self, theme: MemoryTheme) -> str:
         """Build a prompt for consolidating a thematic cluster of memories"""
-        return f"Consolidate these related memories into a single semantic memory: {theme.description}. Related memories: {'; '.join([m.content for m in theme.related_memories])}"
+        return f"Consolidate these related memories into a single semantic memory: {theme.description}. Related memories: {'; '.join([m.content for m in theme._related_memories])}"
 
     async def evolve_user_personality(self, user_id: str) -> PersonalityEvolutionResult:
         """

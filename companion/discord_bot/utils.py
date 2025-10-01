@@ -129,16 +129,29 @@ def setup_logging():
 def validate_discord_token(token: str) -> bool:
     """
     Basic validation of Discord bot token format.
+    Discord tokens have format: [ID].[Timestamp].[HMAC]
+    Each part is base64-encoded (alphanumeric, underscores, hyphens).
     """
     if not token:
         return False
-    
-    # Discord tokens typically have this format: [4-5 char].[Old-style longer string].[Newer longer string]
-    # This is a basic check - not foolproof
-    if re.match(r'^[A-Za-z0-9_-]{4,}\.eyJ0eXAiOiJKV1Qi[0-9A-Za-z_-]{20,}\.[0-9A-Za-z_-]{20,}$', token):
-        return True
-    
-    return False
+
+    # Discord bot token format: [Base64 ID].[Base64 Timestamp].[Base64 HMAC]
+    # Example: <REDACTED_TOKEN_EXAMPLE>
+    parts = token.split('.')
+    if len(parts) != 3:
+        return False
+
+    # Each part should be non-empty and contain only valid base64 characters
+    for part in parts:
+        if not part or not re.match(r'^[A-Za-z0-9_-]+$', part):
+            return False
+
+    # First part (ID) should be at least 10 characters
+    # Last two parts should be at least 6 characters each
+    if len(parts[0]) < 10 or len(parts[1]) < 6 or len(parts[2]) < 6:
+        return False
+
+    return True
 
 
 async def send_safe_message(channel: discord.TextChannel, content: str, **kwargs) -> Optional[discord.Message]:

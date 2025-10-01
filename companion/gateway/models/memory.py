@@ -7,7 +7,7 @@ system to store, retrieve, and maintain consistency of the AI's memories.
 """
 
 from datetime import datetime
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from pydantic import BaseModel, Field
 import uuid
 
@@ -33,7 +33,7 @@ class EpisodicMemory(BaseModel):
         default="episodic",
         description="Type of memory ('episodic' for this class)"
     )
-    timestamp: datetime = Field(
+    created_at: datetime = Field(
         default_factory=datetime.utcnow,
         description="When this memory was created"
     )
@@ -89,7 +89,7 @@ class SemanticMemory(BaseModel):
         default="semantic",
         description="Type of memory ('semantic' for this class)"
     )
-    timestamp: datetime = Field(
+    created_at: datetime = Field(
         default_factory=datetime.utcnow,
         description="When this memory was created"
     )
@@ -144,6 +144,7 @@ class MemoryQuery(BaseModel):
     )
     query_text: str = Field(
         ...,
+        alias="text",
         description="Text to search for in memories"
     )
     query_embedding: Optional[List[float]] = Field(
@@ -169,6 +170,26 @@ class MemoryQuery(BaseModel):
     time_filter_hours: Optional[int] = Field(
         default=None,
         description="Only return memories created within this many hours (if specified)"
+    )
+    time_range_start: Optional[datetime] = Field(
+        default=None,
+        description="Start of time range filter (inclusive)"
+    )
+    time_range_end: Optional[datetime] = Field(
+        default=None,
+        description="End of time range filter (inclusive)"
+    )
+    min_importance: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Minimum importance score filter (0.0-1.0)"
+    )
+    lambda_param: Optional[float] = Field(
+        default=0.7,
+        ge=0.0,
+        le=1.0,
+        description="MMR lambda parameter balancing relevance vs diversity (0.0 = max diversity, 1.0 = max relevance)"
     )
     metadata_filter: Optional[Dict[str, Any]] = Field(
         default=None,
@@ -315,3 +336,47 @@ class ConsolidationResult(BaseModel):
     def add_consolidation_error(self, theme: str, error: str):
         """Add an error that occurred during theme consolidation."""
         self.errors.append(f"Theme '{theme}': {error}")
+
+
+# Type alias for generic Memory (can be either episodic or semantic)
+Memory = Union[EpisodicMemory, SemanticMemory]
+
+
+class MemorySearchResult(BaseModel):
+    """
+    Result from a memory search operation, including the memory and its similarity score.
+    """
+    memory: Memory = Field(
+        ...,
+        description="The memory object (episodic or semantic)"
+    )
+    similarity_score: float = Field(
+        ...,
+        ge=0.0,
+        le=1.0,
+        description="Similarity score between query and memory (0.0-1.0)"
+    )
+    relevance_score: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Combined relevance score from MMR algorithm (0.0-1.0)"
+    )
+
+
+class ConsolidationBatch(BaseModel):
+    """
+    Result of a batch memory consolidation operation.
+    """
+    original_memory_ids: List[str] = Field(
+        default_factory=list,
+        description="IDs of original episodic memories that were consolidated"
+    )
+    consolidated_memory_ids: List[str] = Field(
+        default_factory=list,
+        description="IDs of resulting semantic memories after consolidation"
+    )
+    consolidation_timestamp: datetime = Field(
+        default_factory=datetime.utcnow,
+        description="When the consolidation occurred"
+    )

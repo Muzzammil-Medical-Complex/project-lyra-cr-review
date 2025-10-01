@@ -291,9 +291,10 @@ class BackgroundTaskManager:
 
 class BackgroundServiceManager:
     """Higher-level manager for background services."""
-    
+
     def __init__(self, services_container):
         self.services = services_container
+        self.logger = logging.getLogger(__name__)
         self.background_manager = BackgroundTaskManager(
             db_manager=services_container.db,
             groq_client=services_container.groq
@@ -310,22 +311,22 @@ class BackgroundServiceManager:
         
         # Start monitoring tasks
         await self.background_manager.start_monitoring_tasks()
-        
+
         self.initialized = True
-        self.services.logger.info("Background service manager initialized")
+        self.logger.info("Background service manager initialized")
 
     async def start(self):
         """Start the background service manager."""
         if not self.initialized:
             await self.initialize()
-        
-        self.services.logger.info("Background service manager started")
+
+        self.logger.info("Background service manager started")
 
     async def stop(self, timeout: float = 30.0):
         """Stop the background service manager."""
         await self.background_manager.graceful_shutdown(timeout)
         await self.background_manager.cleanup_resources()
-        self.services.logger.info("Background service manager stopped")
+        self.logger.info("Background service manager stopped")
 
     async def health_check(self) -> Dict[str, Any]:
         """Perform health check on background services."""

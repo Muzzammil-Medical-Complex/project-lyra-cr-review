@@ -6,6 +6,11 @@ organized in a hierarchy with a common base class for consistent error handling.
 """
 
 from typing import Optional
+from fastapi import FastAPI, Request, status
+from fastapi.responses import JSONResponse
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class CompanionBaseException(Exception):
@@ -34,7 +39,7 @@ class CompanionBaseException(Exception):
 
 class UserNotFoundError(CompanionBaseException):
     """Raised when a user cannot be found in the system."""
-    
+
     def __init__(self, user_id: str, message: Optional[str] = None):
         """
         Initialize the exception with a specific user ID.
@@ -45,8 +50,26 @@ class UserNotFoundError(CompanionBaseException):
         """
         if message is None:
             message = f"User with ID '{user_id}' not found in the system"
-        
+
         super().__init__(message, error_code="USER_NOT_FOUND", details={"user_id": user_id})
+
+
+class UserCreationError(CompanionBaseException):
+    """Raised when user creation fails."""
+
+    def __init__(self, message: str, user_id: Optional[str] = None):
+        """
+        Initialize the exception with error details.
+
+        Args:
+            message (str): Error message describing what went wrong
+            user_id (Optional[str]): The user ID associated with the failed creation attempt
+        """
+        super().__init__(
+            message,
+            error_code="USER_CREATION_FAILED",
+            details={"user_id": user_id} if user_id else {}
+        )
 
 
 class SecurityThreatDetected(CompanionBaseException):
@@ -192,7 +215,7 @@ class LettaServiceError(CompanionBaseException):
 
 class ConfigurationError(CompanionBaseException):
     """Raised when there is an error in configuration or missing required settings."""
-    
+
     def __init__(self, setting_name: str, message: Optional[str] = None):
         """
         Initialize the exception with details about the configuration error.
@@ -203,5 +226,54 @@ class ConfigurationError(CompanionBaseException):
         """
         if message is None:
             message = f"Configuration error: missing or invalid setting '{setting_name}'"
-        
+
         super().__init__(message, error_code="CONFIGURATION_ERROR", details={"setting_name": setting_name})
+
+
+def setup_exception_handlers(app: FastAPI):
+    """
+    Set up custom exception handlers for the FastAPI application.
+
+    Args:
+        app (FastAPI): The FastAPI application instance
+    """
+
+    @app.exception_handler(CompanionBaseException)
+    async def companion_exception_handler(request: Request, exc: CompanionBaseException):
+        """Handle all custom Companion exceptions."""
+        logger.error(f"Companion exception: {exc.error_code} - {exc.message}", extra={"details": exc.details})
+
+        # Map specific exception types to HTTP status codes
+        status_code_map = {
+            "USER_NOT_FOUND": status.HTTP_404_NOT_FOUND,
+            "USER_CREATION_FAILED": status.HTTP_400_BAD_REQUEST,
+            "SECURITY_THREAT_DETECTED": status.HTTP_403_FORBIDDEN,
+            "SERVICE_UNAVAILABLE": status.HTTP_503_SERVICE_UNAVAILABLE,
+            "MEMORY_CONFLICT": status.HTTP_409_CONFLICT,
+            "CONFIGURATION_ERROR": status.HTTP_500_INTERNAL_SERVER_ERROR,
+        }
+
+        status_code = status_code_map.get(exc.error_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return JSONResponse(
+            status_code=status_code,
+            content={
+                "error": exc.error_code,
+                "message": exc.message,
+                "details": exc.details
+            }
+        )
+
+    @app.exception_handler(Exception)
+    async def general_exception_handler(request: Request, exc: Exception):
+        """Handle all uncaught exceptions."""
+        logger.exception(f"Unhandled exception: {str(exc)}")
+
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={
+                "error": "INTERNAL_SERVER_ERROR",
+                "message": "An unexpected error occurred",
+                "details": {}
+            }
+        )

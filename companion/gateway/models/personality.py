@@ -7,7 +7,7 @@ to maintain and evolve the AI companion's personality over time.
 """
 
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field, field_validator
 import re
 
