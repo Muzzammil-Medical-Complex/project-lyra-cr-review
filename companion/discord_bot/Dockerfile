@@ -5,8 +5,11 @@ FROM python:3.11-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
+ARG DISCORD_BOT_PORT=8001
+ENV DISCORD_BOT_PORT=${DISCORD_BOT_PORT}
+
 # Set the working directory
-WORKDIR /app
+WORKDIR /root_app
 
 # Install system dependencies
 RUN apt-get update \
@@ -16,22 +19,22 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the requirements file first to leverage Docker cache
-COPY discord_bot/requirements.txt .
+COPY requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
-# Copy the application code
-COPY discord_bot/ /app/
+# Copy the application code as a package
+COPY . /root_app/discord_bot/
 
 # Create non-root user
 RUN adduser --disabled-password --gecos '' appuser
-RUN chown -R appuser:appuser /app
+RUN chown -R appuser:appuser /root_app
 USER appuser
 
 # Expose port if needed for health checks (though Discord bots typically don't expose HTTP)
-EXPOSE 8001
+EXPOSE ${DISCORD_BOT_PORT}
 
 # Run the application
-CMD ["python", "bot.py"]
+CMD ["python", "-m", "discord_bot.bot"]

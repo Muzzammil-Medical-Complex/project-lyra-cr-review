@@ -217,44 +217,51 @@ class DatabaseManager:
     async def get_user_profile(self, user_id: str):
         """Get user profile by user_id with proper scoping."""
         query = "SELECT * FROM user_profiles WHERE user_id = $1"
-        result = await self.execute_user_query(user_id, query, (user_id,))
-        return result[0] if result else None
+        async with self.pool.acquire() as conn:
+            result = await conn.fetch(query, user_id)
+            return result[0] if result else None
 
     async def get_user_needs(self, user_id: str):
         """Get user needs by user_id with proper scoping."""
         query = "SELECT * FROM needs WHERE user_id = $1"
-        result = await self.execute_user_query(user_id, query, (user_id,))
-        return result
+        async with self.pool.acquire() as conn:
+            result = await conn.fetch(query, user_id)
+            return result
 
     async def get_user_quirks(self, user_id: str):
         """Get user quirks by user_id with proper scoping."""
         query = "SELECT * FROM quirks WHERE user_id = $1 AND is_active = true"
-        result = await self.execute_user_query(user_id, query, (user_id,))
-        return result
+        async with self.pool.acquire() as conn:
+            result = await conn.fetch(query, user_id)
+            return result
 
     async def get_user_interactions(self, user_id: str, limit: int = 10):
         """Get user interactions by user_id with proper scoping."""
         query = "SELECT * FROM interactions WHERE user_id = $1 ORDER BY timestamp DESC LIMIT $2"
-        result = await self.execute_user_query(user_id, query, (user_id, limit))
-        return result
+        async with self.pool.acquire() as conn:
+            result = await conn.fetch(query, user_id, limit)
+            return result
 
     async def get_personality_state(self, user_id: str):
         """Get current personality state for user."""
         query = "SELECT * FROM personality_state WHERE user_id = $1 AND is_current = true"
-        result = await self.execute_user_query(user_id, query, (user_id,))
-        return result[0] if result else None
+        async with self.pool.acquire() as conn:
+            result = await conn.fetch(query, user_id)
+            return result[0] if result else None
 
     async def get_active_quirks(self, user_id: str):
         """Get active quirks for user."""
         query = "SELECT * FROM quirks WHERE user_id = $1 AND is_active = true"
-        result = await self.execute_user_query(user_id, query, (user_id,))
-        return result
+        async with self.pool.acquire() as conn:
+            result = await conn.fetch(query, user_id)
+            return result
 
     async def get_urgent_needs(self, user_id: str):
         """Get urgent needs for user."""
         query = "SELECT * FROM needs WHERE user_id = $1 AND current_level > trigger_threshold"
-        result = await self.execute_user_query(user_id, query, (user_id,))
-        return result
+        async with self.pool.acquire() as conn:
+            result = await conn.fetch(query, user_id)
+            return result
 
     async def log_interaction(self, interaction) -> bool:
         """Log an interaction with proper user scoping."""
@@ -443,6 +450,92 @@ class DatabaseManager:
     async def get_detailed_activity_patterns(self, user_id: str) -> List[Dict[str, Any]]:
         """Get detailed activity patterns for proactive timing (stub implementation)."""
         return []
+
+    async def get_all_users(self, skip: int = 0, limit: int = 50) -> List[Dict[str, Any]]:
+        """Get a paginated list of all users."""
+        query = "SELECT * FROM user_profiles ORDER BY created_at DESC LIMIT $1 OFFSET $2"
+        async with self.pool.acquire() as conn:
+            result = await conn.fetch(query, limit, skip)
+            return [dict(row) for row in result]
+
+    async def get_total_user_count(self) -> int:
+        """Get the total count of users in the system."""
+        query = "SELECT COUNT(*) as count FROM user_profiles"
+        async with self.pool.acquire() as conn:
+            result = await conn.fetchval(query)
+            return result if result else 0
+
+    async def get_active_users_count(self, since: datetime) -> int:
+        """Get the count of active users since a specific timestamp."""
+        query = """
+        SELECT COUNT(DISTINCT user_id) as count FROM interactions
+        WHERE timestamp > $1
+        """
+        async with self.pool.acquire() as conn:
+            result = await conn.fetchval(query, since)
+            return result if result else 0
+
+    async def get_total_interaction_count(self) -> int:
+        """Get the total count of interactions in the system."""
+        query = "SELECT COUNT(*) as count FROM interactions"
+        async with self.pool.acquire() as conn:
+            result = await conn.fetchval(query)
+            return result if result else 0
+
+    async def get_interaction_count_since(self, since: datetime) -> int:
+        """Get the count of interactions since a specific timestamp."""
+        query = "SELECT COUNT(*) as count FROM interactions WHERE timestamp > $1"
+        async with self.pool.acquire() as conn:
+            result = await conn.fetchval(query, since)
+            return result if result else 0
+
+    async def get_security_incidents(self, limit: int = 50, offset: int = 0,
+                                    severity: Optional[str] = None,
+                                    status: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Get security incidents with optional filtering."""
+        query = "SELECT * FROM security_incidents WHERE 1=1"
+        params = []
+        param_index = 1
+
+        if severity:
+            query += f" AND severity = ${param_index}"
+            params.append(severity)
+            param_index += 1
+
+        if status:
+            query += f" AND status = ${param_index}"
+            params.append(status)
+            param_index += 1
+
+        query += f" ORDER BY detected_at DESC LIMIT ${param_index} OFFSET ${param_index + 1}"
+        params.extend([limit, offset])
+
+        async with self.pool.acquire() as conn:
+            result = await conn.fetch(query, *params)
+            return [dict(row) for row in result]
+
+    async def cleanup_inactive_users(self) -> int:
+        """Clean up inactive users based on retention policy (users inactive for >365 days)."""
+        query = """
+        UPDATE user_profiles
+        SET status = 'inactive'
+        WHERE user_id IN (
+            SELECT user_id FROM user_profiles
+            WHERE status = 'active'
+            AND user_id NOT IN (
+                SELECT DISTINCT user_id FROM interactions
+                WHERE timestamp > NOW() - INTERVAL '365 days'
+            )
+        )
+        """
+        async with self.pool.acquire() as conn:
+            result = await conn.execute(query)
+            # Extract the number of rows affected from the result
+            # PostgreSQL returns "UPDATE N" where N is the number of rows
+            affected = 0
+            if result and result.startswith('UPDATE'):
+                affected = int(result.split(' ')[1]) if len(result.split(' ')) > 1 else 0
+            return affected
 
     # @staticmethod
     # def get_instance():

@@ -18,7 +18,7 @@ from ..utils.exceptions import UserNotFoundError, PersonalityEngineError
 # Import dependency functions from main
 from ..main import get_personality, get_users, get_db, get_memory
 
-router = APIRouter(prefix="/personality", tags=["personality"])
+router = APIRouter(tags=["personality"])
 
 logger = logging.getLogger(__name__)
 

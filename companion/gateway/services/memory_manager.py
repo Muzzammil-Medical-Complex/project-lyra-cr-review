@@ -651,3 +651,113 @@ class MemoryManager:
         except Exception as e:
             self.logger.error(f"Failed to cleanup memories: {e}")
             return 0
+
+    async def get_total_memory_count(self) -> int:
+        """
+        Get the total count of memories across all users.
+
+        Returns:
+            Total number of memories in all collections
+        """
+        try:
+            total_count = 0
+
+            # Get all collections
+            collections = await asyncio.get_event_loop().run_in_executor(
+                None, self.qdrant.get_collections
+            )
+
+            # Sum up the point counts from all memory collections
+            for collection in collections.collections:
+                if collection.name.startswith('episodic_') or collection.name.startswith('semantic_'):
+                    collection_info = await asyncio.get_event_loop().run_in_executor(
+                        None, self.qdrant.get_collection, collection.name
+                    )
+                    total_count += collection_info.points_count
+
+            self.logger.debug(f"Total memory count across all users: {total_count}")
+            return total_count
+        except Exception as e:
+            self.logger.error(f"Failed to get total memory count: {e}")
+            return 0
+
+    async def migrate_memories(self, source_user_id: str, target_user_id: str) -> int:
+        """
+        Migrate all memories from one user to another.
+        Useful for account merging or data migration scenarios.
+
+        Args:
+            source_user_id: The user ID to migrate memories from
+            target_user_id: The user ID to migrate memories to
+
+        Returns:
+            Number of memories migrated
+        """
+        try:
+            migrated_count = 0
+
+            # Migrate episodic memories
+            source_episodic = f"episodic_{source_user_id}"
+            target_episodic = f"episodic_{target_user_id}"
+
+            if await self._collection_exists(source_episodic):
+                # Create target collection if it doesn't exist
+                if not await self._collection_exists(target_episodic):
+                    await self._create_collection(target_episodic)
+
+                # Get all points from source collection
+                scroll_result = await asyncio.get_event_loop().run_in_executor(
+                    None,
+                    lambda: self.qdrant.scroll(
+                        collection_name=source_episodic,
+                        limit=10000  # Adjust based on expected memory counts
+                    )
+                )
+
+                points = scroll_result[0]
+                if points:
+                    # Re-upload points to target collection
+                    await asyncio.get_event_loop().run_in_executor(
+                        None,
+                        lambda: self.qdrant.upsert(
+                            collection_name=target_episodic,
+                            points=points
+                        )
+                    )
+                    migrated_count += len(points)
+
+            # Migrate semantic memories
+            source_semantic = f"semantic_{source_user_id}"
+            target_semantic = f"semantic_{target_user_id}"
+
+            if await self._collection_exists(source_semantic):
+                # Create target collection if it doesn't exist
+                if not await self._collection_exists(target_semantic):
+                    await self._create_collection(target_semantic)
+
+                # Get all points from source collection
+                scroll_result = await asyncio.get_event_loop().run_in_executor(
+                    None,
+                    lambda: self.qdrant.scroll(
+                        collection_name=source_semantic,
+                        limit=10000
+                    )
+                )
+
+                points = scroll_result[0]
+                if points:
+                    # Re-upload points to target collection
+                    await asyncio.get_event_loop().run_in_executor(
+                        None,
+                        lambda: self.qdrant.upsert(
+                            collection_name=target_semantic,
+                            points=points
+                        )
+                    )
+                    migrated_count += len(points)
+
+            self.logger.info(f"Migrated {migrated_count} memories from {source_user_id} to {target_user_id}")
+            return migrated_count
+        except Exception as e:
+            self.logger.error(f"Failed to migrate memories from {source_user_id} to {target_user_id}: {e}")
+            return 0

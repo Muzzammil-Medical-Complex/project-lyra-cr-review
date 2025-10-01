@@ -229,7 +229,7 @@ class PersonalityEngine:
         """
         
         try:
-            result = await self.db.execute_user_query(user_id, query, (user_id,), fetch=True)
+            result = await self.db.execute_user_query(user_id, query, (user_id,))
             if not result:
                 return None
             
@@ -536,7 +536,7 @@ class PersonalityEngine:
                 LIMIT 1
             """
             
-            result = await self.db.execute_user_query(user_id, query, (user_id, quirk_name), fetch=True)
+            result = await self.db.execute_user_query(user_id, query, (user_id, quirk_name))
             if not result:
                 return False
             

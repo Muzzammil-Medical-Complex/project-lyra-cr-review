@@ -14,7 +14,7 @@ from ..services.groq_client import GroqClient
 from ..services.chutes_client import ChutesClient
 from ..main import get_db, get_groq, get_chutes
 
-router = APIRouter(prefix="/health", tags=["health"])
+router = APIRouter(tags=["health"])
 
 # Configure logger
 logger = logging.getLogger(__name__)

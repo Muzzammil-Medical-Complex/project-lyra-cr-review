@@ -17,7 +17,7 @@ from ..services.memory_manager import MemoryManager
 from ..database import DatabaseManager
 from ..utils.scheduler import SchedulerService
 from ..utils.background import BackgroundServiceManager
-from ..utils.exceptions import UserNotFoundError, AdminPrivilegeRequired
+from ..utils.exceptions import UserNotFoundError
 
 # Import dependency functions from main
 from ..main import (
@@ -25,7 +25,7 @@ from ..main import (
     get_scheduler, get_background
 )
 
-router = APIRouter(prefix="/admin", tags=["admin"])
+router = APIRouter(tags=["admin"])
 
 logger = logging.getLogger(__name__)
 

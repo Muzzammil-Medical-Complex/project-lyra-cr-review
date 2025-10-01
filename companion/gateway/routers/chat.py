@@ -26,7 +26,7 @@ from ..main import (
     get_security, get_appraisal, get_proactive, get_db
 )
 
-router = APIRouter(prefix="/chat", tags=["chat"])
+router = APIRouter(tags=["chat"])
 
 logger = logging.getLogger(__name__)
 

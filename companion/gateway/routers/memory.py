@@ -19,7 +19,7 @@ from ..utils.exceptions import MemoryManagerError, UserNotFoundError
 # Import dependency functions from main
 from ..main import get_memory, get_users, get_db, get_personality
 
-router = APIRouter(prefix="/memory", tags=["memory"])
+router = APIRouter(tags=["memory"])
 
 logger = logging.getLogger(__name__)
 

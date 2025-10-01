@@ -112,7 +112,11 @@ class UserService:
         Retrieve a user profile by user_id
         """
         try:
-            return await self.db.get_user_profile(user_id)
+            record = await self.db.get_user_profile(user_id)
+            if record:
+                # Convert asyncpg.Record to UserProfile model
+                return UserProfile(**dict(record))
+            return None
         except Exception as e:
             logger.error(f"Error retrieving user profile for {user_id}: {e}")
             return None
