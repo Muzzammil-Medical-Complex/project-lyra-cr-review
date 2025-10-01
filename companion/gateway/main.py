@@ -45,11 +45,10 @@ from .services.memory_manager import MemoryManager
 from .services.letta_service import LettaService
 from .services.user_service import UserService
 
-# Phase 4: Advanced Services & Routers - Import everything else
-from .services.proactive_manager import ProactiveManager
-from .services.reflection import ReflectionService
+# Phase 4: Advanced Services - Import advanced services
+from .agents.proactive_manager import ProactiveManager
+from .agents.reflection import ReflectionAgent
 from .agents.appraisal import AppraisalEngine
-from .routers import chat, memory, personality, admin, health
 
 
 class ServiceContainer:
@@ -71,7 +70,7 @@ class ServiceContainer:
         self.letta: Optional[LettaService] = None
         self.users: Optional[UserService] = None
         self.proactive: Optional[ProactiveManager] = None
-        self.reflection: Optional[ReflectionService] = None
+        self.reflection: Optional[ReflectionAgent] = None
         self.appraisal: Optional[AppraisalEngine] = None
         self.scheduler: Optional[SchedulerService] = None
         self.background: Optional[BackgroundServiceManager] = None
@@ -118,11 +117,21 @@ def get_users() -> UserService:
 def get_proactive() -> ProactiveManager:
     return services.proactive
 
-def get_reflection() -> ReflectionService:
+def get_reflection() -> ReflectionAgent:
     return services.reflection
 
 def get_appraisal() -> AppraisalEngine:
     return services.appraisal
+
+def get_scheduler() -> SchedulerService:
+    return services.scheduler
+
+def get_background() -> BackgroundServiceManager:
+    return services.background
+
+
+# Import routers after all dependency providers are defined (avoids circular imports)
+from .routers import chat, memory, personality, admin, health
 
 
 @asynccontextmanager
@@ -181,8 +190,7 @@ async def lifespan(app: FastAPI):
     logger.info("⚙️ Phase 3: Initializing core services...")
 
     services.personality = PersonalityEngine(
-        db=services.db,
-        groq_client=services.groq
+        db_manager=services.db
     )
 
     # FIXED: Initialize MemoryManager with the actual embedding client
@@ -191,8 +199,7 @@ async def lifespan(app: FastAPI):
         embedding_client=services.embedding_client,  # Fixed: Pass the actual embedding client
         importance_scorer=services.importance_scorer,
         mmr_ranker=services.mmr,
-        db_manager=services.db,
-        groq_client=services.groq
+        db_manager=services.db
     )
     
     services.letta = LettaService(
@@ -223,7 +230,7 @@ async def lifespan(app: FastAPI):
         db_manager=services.db
     )
     
-    services.reflection = ReflectionService(
+    services.reflection = ReflectionAgent(
         memory_manager=services.memory,
         personality_engine=services.personality,
         groq_client=services.groq,
@@ -358,6 +365,12 @@ async def service_info():
             "/health"
         ]
     }
+
+
+@app.get("/health")
+async def health_check():
+    """Simple health check endpoint for container orchestration."""
+    return {"status": "healthy"}
 
 
 @app.get("/status")

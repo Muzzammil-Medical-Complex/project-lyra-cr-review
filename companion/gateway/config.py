@@ -215,10 +215,9 @@ class Settings(BaseSettings):
     )
 
     class Config:
-        # Load from .env file
-        env_file = ".env"
+        # Environment variables are passed via docker-compose
         env_file_encoding = 'utf-8'
-        case_sensitive = True
+        case_sensitive = False
 
 
 # Create a single instance of settings
