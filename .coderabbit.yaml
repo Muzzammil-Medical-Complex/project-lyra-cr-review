@@ -1,0 +1,55 @@
+reviews:
+  path_filters:
+    # Build & cache artifacts
+    - "!**/__pycache__/**"
+    - "!**/*.pyc"
+    - "!**/*.pyo"
+    - "!**/*.pyd"
+    - "!**/*.egg-info/**"
+    - "!.pytest_cache/**"
+    - "!.mypy_cache/**"
+    - "!.tox/**"
+    - "!.nox/**"
+    - "!**/.coverage*"
+    - "!htmlcov/**"
+
+    # Development tool files
+    - "!.aider*"
+    - "!.aider.tags.cache.v4/**"
+    - "!.claude/**"
+    - "!repomix-output.xml"
+
+    # Environment & dependencies
+    - "!venv/**"
+    - "!.venv/**"
+    - "!env/**"
+    - "!.env/**"
+    - "!.env"
+    - "!.env.*"
+    - "!*.env.local"
+    - "!.python-version"
+    - "!node_modules/**"
+
+    # Test results & logs
+    - "!companion/TEST_RESULTS.md"
+    - "!**/*.log"
+    - "!logs/**"
+    - "!**/*.sqlite3"
+
+    # IDE files
+    - "!.vscode/**"
+    - "!.idea/**"
+    - "!**/*.swp"
+    - "!**/*~"
+    - "!.DS_Store"
+
+    # Documentation (changes frequently with development)
+    - "!AUDIT_AND_REMEDIATION_PLAN.md"
+    - "!MASTER_IMPLEMENTATION_GUIDE.md"
+    - "!companion/TEST_SUITE.md"
+
+    # Scripts (deployment and testing automation)
+    - "!**/*.sh"
+
+    # Database migrations (typically write-once, schema changes)
+    - "!database/migrations/*.sql"
