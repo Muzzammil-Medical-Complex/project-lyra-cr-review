@@ -264,19 +264,21 @@ async def embed_batch(request: EmbedBatchRequest, _: str = Depends(verify_api_ke
                 logger.info(f"Generating embeddings for {len(texts_to_generate)} texts...")
                 
                 # Using thread pool for batch generation
-                def generate_batch_embeddings():
-                    return genai.embed_content(
-                        model="models/embedding-001",
-                        content=texts_to_generate,
-                        task_type=request.task_type,
-                        title=request.title
-                    )
-                
-                batch_result = await asyncio.get_event_loop().run_in_executor(
+                def generate_batch_embeddings(texts=texts_to_generate):
+                    embeddings = []
+                    for text in texts:
+                        result = genai.embed_content(
+                            model="models/embedding-001",
+                            content=text,
+                            task_type=request.task_type,
+                            title=request.title
+                        )
+                        embeddings.append(result["embedding"])
+                    return embeddings
+
+                generated_embeddings = await asyncio.get_event_loop().run_in_executor(
                     thread_pool, generate_batch_embeddings
                 )
-                
-                generated_embeddings = batch_result['embedding']
                 
                 # Update results and cache
                 gen_idx = 0

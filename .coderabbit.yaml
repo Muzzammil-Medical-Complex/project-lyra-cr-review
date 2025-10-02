@@ -52,4 +52,4 @@ reviews:
     - "!**/*.sh"
 
     # Database migrations (typically write-once, schema changes)
-    - "!database/migrations/*.sql"
+    - "!companion/database/migrations/*.sql"

@@ -95,7 +95,7 @@ class CompanionCommands(commands.Cog):
                     await ctx.respond("Sorry, I'm having trouble connecting to my brain right now. Please try again later.", ephemeral=True)
 
             except Exception as e:
-                error_msg = await handle_error(e, ctx)
+                error_msg = handle_error(e, ctx)
                 await ctx.respond(error_msg, ephemeral=True)
 
     @discord.slash_command(

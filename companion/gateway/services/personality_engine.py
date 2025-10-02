@@ -86,19 +86,19 @@ class PersonalityEngine:
                     initial_pad.to_emotion_octant(),
                     initial_pad.model_dump_json()
                 )
-                
-                result = await tx.execute(query, params)
-                if not result:
+
+                row = await tx.connection.fetchrow(query, *params)
+                if row is None:
                     raise PersonalityEngineError(
                         message="Failed to create initial personality state",
                         operation="initialize_personality"
                     )
-                
+
                 # Mark as current state
-                state_id = result[0]['id']
+                state_id = row["id"]
                 await tx.execute(
                     "UPDATE personality_state SET is_current = TRUE WHERE id = $1",
-                    (state_id,)
+                    state_id
                 )
                 
                 # Initialize default quirks
@@ -368,7 +368,7 @@ class PersonalityEngine:
             """
             
             personality_result = await self.db.execute_user_query(
-                user_id, personality_query, (user_id,), fetch=True
+                user_id, personality_query, (user_id,)
             )
             
             if not personality_result:
@@ -384,7 +384,7 @@ class PersonalityEngine:
             """
             
             quirks_result = await self.db.execute_user_query(
-                user_id, quirks_query, (user_id,), fetch=True
+                user_id, quirks_query, (user_id,)
             )
             
             active_quirks = [
@@ -403,22 +403,21 @@ class PersonalityEngine:
             # Get psychological needs
             needs_query = """
                 SELECT need_type, current_level, baseline_level, decay_rate,
-                       last_satisfied, trigger_threshold, satisfaction_rate
+                       trigger_threshold, satisfaction_rate
                 FROM needs
                 WHERE user_id = $1
             """
-            
+
             needs_result = await self.db.execute_user_query(
-                user_id, needs_query, (user_id,), fetch=True
+                user_id, needs_query, (user_id,)
             )
-            
+
             psychological_needs = [
                 PsychologicalNeed(
                     need_type=need_row['need_type'],
                     current_level=need_row['current_level'],
                     baseline_level=need_row['baseline_level'],
                     decay_rate=need_row['decay_rate'],
-                    last_satisfied=need_row['last_satisfied'],
                     trigger_threshold=need_row['trigger_threshold'],
                     satisfaction_rate=need_row['satisfaction_rate']
                 )
@@ -594,7 +593,7 @@ class PersonalityEngine:
             """
             
             interactions_result = await self.db.execute_user_query(
-                user_id, interactions_query, (user_id,), fetch=True
+                user_id, interactions_query, (user_id,)
             )
             
             if len(interactions_result) < 5:  # Need minimum data
@@ -720,3 +719,369 @@ class PersonalityEngine:
         except Exception as e:
             self.logger.error(f"Failed to update need level for user {user_id}, need {need_type}: {e}")
             return False
+    async def get_personality_history(self, user_id: str, days: int = 30) -> list[PersonalitySnapshot]:
+        """
+        Get historical personality snapshots for a user.
+
+        Args:
+            user_id: Discord user ID
+            days: Number of days of history to retrieve (default 30)
+
+        Returns:
+            List of PersonalitySnapshot objects ordered by most recent first
+        """
+        try:
+            query = """
+                SELECT id, user_id, openness, conscientiousness, extraversion, agreeableness, neuroticism,
+                       pleasure, arousal, dominance, emotion_label, pad_baseline, is_current, created_at
+                FROM personality_state
+                WHERE user_id = $1 AND created_at >= NOW() - INTERVAL '$2 days'
+                ORDER BY created_at DESC
+            """
+
+            rows = await self.db.execute_user_query(user_id, query, (user_id,))
+
+            history = []
+            for row in rows:
+                # Parse PAD baseline
+                pad_baseline_data = row['pad_baseline']
+                if isinstance(pad_baseline_data, str):
+                    pad_baseline_dict = json.loads(pad_baseline_data)
+                elif isinstance(pad_baseline_data, dict):
+                    pad_baseline_dict = pad_baseline_data
+                else:
+                    pad_baseline_dict = {'pleasure': 0.0, 'arousal': 0.0, 'dominance': 0.0}
+
+                pad_baseline = PADState(**pad_baseline_dict)
+
+                snapshot = PersonalitySnapshot(
+                    user_id=row['user_id'],
+                    big_five=BigFiveTraits(
+                        openness=row['openness'],
+                        conscientiousness=row['conscientiousness'],
+                        extraversion=row['extraversion'],
+                        agreeableness=row['agreeableness'],
+                        neuroticism=row['neuroticism']
+                    ),
+                    current_pad=PADState(
+                        pleasure=row['pleasure'],
+                        arousal=row['arousal'],
+                        dominance=row['dominance'],
+                        pad_baseline=pad_baseline
+                    ),
+                    active_quirks=[],  # Not including quirks in history for performance
+                    psychological_needs=[]  # Not including needs in history for performance
+                )
+                history.append(snapshot)
+
+            return history
+
+        except Exception as e:
+            self.logger.error(f"Failed to get personality history for user {user_id}: {e}")
+            return []
+
+    async def get_active_quirks(self, user_id: str) -> list[Quirk]:
+        """
+        Get all active quirks for a user.
+
+        Args:
+            user_id: Discord user ID
+
+        Returns:
+            List of active Quirk objects
+        """
+        try:
+            query = """
+                SELECT id, name, category, description, strength, confidence
+                FROM quirks
+                WHERE user_id = $1 AND is_active = TRUE
+                ORDER BY strength DESC
+            """
+
+            rows = await self.db.execute_user_query(user_id, query, (user_id,))
+
+            quirks = [
+                Quirk(
+                    id=str(row['id']),
+                    user_id=user_id,
+                    name=row['name'],
+                    category=row['category'],
+                    description=row['description'],
+                    strength=row['strength'],
+                    confidence=row['confidence']
+                )
+                for row in rows
+            ]
+
+            return quirks
+
+        except Exception as e:
+            self.logger.error(f"Failed to get active quirks for user {user_id}: {e}")
+            return []
+
+    async def get_all_quirks(self, user_id: str) -> list[Quirk]:
+        """
+        Get all quirks (active and inactive) for a user.
+
+        Args:
+            user_id: Discord user ID
+
+        Returns:
+            List of all Quirk objects
+        """
+        try:
+            query = """
+                SELECT id, name, category, description, strength, confidence
+                FROM quirks
+                WHERE user_id = $1
+                ORDER BY is_active DESC, strength DESC
+            """
+
+            rows = await self.db.execute_user_query(user_id, query, (user_id,))
+
+            quirks = [
+                Quirk(
+                    id=str(row['id']),
+                    user_id=user_id,
+                    name=row['name'],
+                    category=row['category'],
+                    description=row['description'],
+                    strength=row['strength'],
+                    confidence=row['confidence']
+                )
+                for row in rows
+            ]
+
+            return quirks
+
+        except Exception as e:
+            self.logger.error(f"Failed to get all quirks for user {user_id}: {e}")
+            return []
+
+    async def get_user_needs(self, user_id: str) -> list[PsychologicalNeed]:
+        """
+        Get all psychological needs for a user.
+
+        Args:
+            user_id: Discord user ID
+
+        Returns:
+            List of PsychologicalNeed objects
+        """
+        try:
+            query = """
+                SELECT need_type, current_level, baseline_level, decay_rate,
+                       trigger_threshold, satisfaction_rate
+                FROM needs
+                WHERE user_id = $1
+                ORDER BY current_level DESC
+            """
+
+            rows = await self.db.execute_user_query(user_id, query, (user_id,))
+
+            needs = [
+                PsychologicalNeed(
+                    need_type=row['need_type'],
+                    current_level=row['current_level'],
+                    baseline_level=row['baseline_level'],
+                    decay_rate=row['decay_rate'],
+                    trigger_threshold=row['trigger_threshold'],
+                    satisfaction_rate=row['satisfaction_rate']
+                )
+                for row in rows
+            ]
+
+            return needs
+
+        except Exception as e:
+            self.logger.error(f"Failed to get user needs for user {user_id}: {e}")
+            return []
+
+    async def get_evolution_metrics(self, user_id: str) -> Dict[str, Any]:
+        """
+        Get personality evolution metrics for a user.
+
+        Args:
+            user_id: Discord user ID
+
+        Returns:
+            Dictionary containing evolution metrics
+        """
+        try:
+            # Get recent personality history
+            history = await self.get_personality_history(user_id, days=30)
+
+            if len(history) < 2:
+                return {
+                    "status": "insufficient_data",
+                    "message": "Need at least 2 personality snapshots to calculate evolution metrics"
+                }
+
+            # Calculate PAD stability (variance)
+            pad_values = {
+                'pleasure': [s.current_pad.pleasure for s in history],
+                'arousal': [s.current_pad.arousal for s in history],
+                'dominance': [s.current_pad.dominance for s in history]
+            }
+
+            import statistics
+            stability = {
+                'pleasure_variance': statistics.variance(pad_values['pleasure']) if len(pad_values['pleasure']) > 1 else 0.0,
+                'arousal_variance': statistics.variance(pad_values['arousal']) if len(pad_values['arousal']) > 1 else 0.0,
+                'dominance_variance': statistics.variance(pad_values['dominance']) if len(pad_values['dominance']) > 1 else 0.0
+            }
+
+            # Calculate overall stability score (inverse of average variance)
+            avg_variance = (stability['pleasure_variance'] + stability['arousal_variance'] + stability['dominance_variance']) / 3
+            stability_score = max(0.0, 1.0 - avg_variance)  # Higher score = more stable
+
+            # Get quirk evolution metrics
+            quirks = await self.get_active_quirks(user_id)
+            quirk_metrics = {
+                'total_quirks': len(quirks),
+                'average_strength': sum(q.strength for q in quirks) / len(quirks) if quirks else 0.0,
+                'average_confidence': sum(q.confidence for q in quirks) / len(quirks) if quirks else 0.0
+            }
+
+            # Get needs metrics
+            needs = await self.get_user_needs(user_id)
+            needs_metrics = {
+                'total_needs': len(needs),
+                'average_level': sum(n.current_level for n in needs) / len(needs) if needs else 0.0,
+                'needs_above_threshold': sum(1 for n in needs if n.current_level >= n.trigger_threshold)
+            }
+
+            return {
+                "status": "success",
+                "stability_score": stability_score,
+                "stability_details": stability,
+                "quirk_metrics": quirk_metrics,
+                "needs_metrics": needs_metrics,
+                "snapshots_analyzed": len(history)
+            }
+
+        except Exception as e:
+            self.logger.error(f"Failed to get evolution metrics for user {user_id}: {e}")
+            return {
+                "status": "error",
+                "message": str(e)
+            }
+
+    async def override_pad_state(self, user_id: str, pad_state: PADState) -> Optional[PersonalitySnapshot]:
+        """
+        Manually override the current PAD state for a user.
+
+        Args:
+            user_id: Discord user ID
+            pad_state: New PAD state to apply
+
+        Returns:
+            Updated PersonalitySnapshot or None on failure
+        """
+        try:
+            update_query = """
+                UPDATE personality_state
+                SET pleasure = $1, arousal = $2, dominance = $3,
+                    emotion_label = $4, updated_at = NOW()
+                WHERE user_id = $5 AND is_current = TRUE
+            """
+
+            emotion_label = pad_state.to_emotion_octant()
+            params = (pad_state.pleasure, pad_state.arousal, pad_state.dominance, emotion_label, user_id)
+
+            await self.db.execute_user_query(user_id, update_query, params)
+
+            # Return updated snapshot
+            return await self.get_personality_snapshot(user_id)
+
+        except Exception as e:
+            self.logger.error(f"Failed to override PAD state for user {user_id}: {e}")
+            return None
+
+    async def get_personality_baseline(self, user_id: str) -> Optional[PersonalitySnapshot]:
+        """
+        Get the baseline personality state for a user (essentially the current snapshot).
+
+        Args:
+            user_id: Discord user ID
+
+        Returns:
+            Current PersonalitySnapshot or None
+        """
+        return await self.get_personality_snapshot(user_id)
+
+    async def get_big_five_traits(self, user_id: str) -> Optional[BigFiveTraits]:
+        """
+        Get the Big Five personality traits for a user.
+
+        Args:
+            user_id: Discord user ID
+
+        Returns:
+            BigFiveTraits object or None
+        """
+        try:
+            query = """
+                SELECT openness, conscientiousness, extraversion, agreeableness, neuroticism
+                FROM personality_state
+                WHERE user_id = $1 AND is_current = TRUE
+            """
+
+            rows = await self.db.execute_user_query(user_id, query, (user_id,))
+
+            if not rows:
+                return None
+
+            row = rows[0]
+            return BigFiveTraits(
+                openness=row['openness'],
+                conscientiousness=row['conscientiousness'],
+                extraversion=row['extraversion'],
+                agreeableness=row['agreeableness'],
+                neuroticism=row['neuroticism']
+            )
+
+        except Exception as e:
+            self.logger.error(f"Failed to get Big Five traits for user {user_id}: {e}")
+            return None
+
+
+    async def get_personality_stability(self, user_id: str, days: int = 14) -> float:
+        """
+        Calculate personality stability score based on PAD variance over time.
+
+        Args:
+            user_id: Discord user ID
+            days: Number of days to analyze (default 14)
+
+        Returns:
+            Stability score from 0.0 (unstable) to 1.0 (very stable)
+        """
+        try:
+            history = await self.get_personality_history(user_id, days=days)
+
+            if len(history) < 2:
+                return 1.0  # Assume stable if not enough data
+
+            # Calculate variance for each PAD dimension
+            import statistics
+            pleasure_values = [s.current_pad.pleasure for s in history]
+            arousal_values = [s.current_pad.arousal for s in history]
+            dominance_values = [s.current_pad.dominance for s in history]
+
+            pleasure_variance = statistics.variance(pleasure_values) if len(pleasure_values) > 1 else 0.0
+            arousal_variance = statistics.variance(arousal_values) if len(arousal_values) > 1 else 0.0
+            dominance_variance = statistics.variance(dominance_values) if len(dominance_values) > 1 else 0.0
+
+            # Average variance
+            avg_variance = (pleasure_variance + arousal_variance + dominance_variance) / 3.0
+
+            # Convert variance to stability score (inverse relationship)
+            # Variance of 0 = stability 1.0, higher variance = lower stability
+            stability_score = max(0.0, min(1.0, 1.0 - (avg_variance * 2.0)))
+
+            return stability_score
+
+        except Exception as e:
+            self.logger.error(f"Failed to calculate personality stability for user {user_id}: {e}")
+            return 0.5  # Return neutral stability on error

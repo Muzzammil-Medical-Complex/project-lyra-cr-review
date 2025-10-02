@@ -49,13 +49,13 @@ async def detailed_health_check(
     # Check database connectivity
     try:
         start_time = time.time()
-         db_health = await db.health_check()
+        db_health = await db.health_check()
         response_time = time.time() - start_time
-         services_status["database"] = {
-             "status": "healthy" if db_health else "unhealthy",
+        services_status["database"] = {
+            "status": "healthy" if db_health else "unhealthy",
             "response_time": response_time,
-             "details": "Connected" if db_health else "Connection failed"
-         }
+            "details": "Connected" if db_health else "Connection failed"
+        }
     except Exception as e:
         services_status["database"] = {
             "status": "unhealthy",

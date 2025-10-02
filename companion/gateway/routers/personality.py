@@ -4,7 +4,7 @@ Provides API endpoints for inspecting and managing the companion's personality s
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Dict, Any, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 
 from ..models.personality import (
@@ -174,7 +174,7 @@ async def get_personality_evolution(
         return {
             "user_id": user_id,
             "evolution_metrics": evolution_metrics,
-            "timestamp": datetime.utcnow()
+            "timestamp": datetime.now(timezone.utc)
         }
         
     except UserNotFoundError:
@@ -244,7 +244,7 @@ async def get_personality_baseline(
         return {
             "user_id": user_id,
             "baseline": baseline,
-            "timestamp": datetime.utcnow()
+            "timestamp": datetime.now(timezone.utc)
         }
         
     except UserNotFoundError:
@@ -289,7 +289,7 @@ async def get_big_five_traits(
 @router.post("/quirk/reinforce/{user_id}", response_model=bool)
 async def reinforce_quirk(
     user_id: str,
-    quirk_name: str,
+    quirk_name: str = Query(..., description="Name of the quirk to reinforce"),
     personality_engine: PersonalityEngine = Depends(get_personality),
     user_service: UserService = Depends(get_users)
 ):
@@ -302,17 +302,21 @@ async def reinforce_quirk(
         user = await user_service.get_user_profile(user_id)
         if not user:
             raise HTTPException(status_code=404, detail=f"User {user_id} not found")
-        
-        # Reinforce the quirk
-        success = await personality_engine.reinforce_quirk(user_id, quirk_name)
-        
+
+        # Reinforce the quirk by increasing its strength
+        success = await personality_engine.update_quirk_strength(
+            user_id=user_id,
+            quirk_name=quirk_name,
+            strength_delta=0.1  # Standard reinforcement amount
+        )
+
         if not success:
             raise HTTPException(status_code=404, detail=f"Quirk '{quirk_name}' not found for user {user_id}")
-        
+
         logger.info(f"Quirk '{quirk_name}' reinforced for user {user_id}")
-        
+
         return success
-        
+
     except UserNotFoundError:
         raise HTTPException(status_code=404, detail=f"User {user_id} not found")
     except PersonalityEngineError as e:
@@ -326,12 +330,12 @@ async def reinforce_quirk(
 async def update_need_level(
     user_id: str,
     need_type: str,
-    new_level: float = Query(..., ge=0.0, le=1.0),
+    level_delta: float = Query(..., ge=-1.0, le=1.0, description="Change in need level (can be negative)"),
     personality_engine: PersonalityEngine = Depends(get_personality),
     user_service: UserService = Depends(get_users)
 ):
     """
-    Update the current level of a specific psychological need.
+    Update the current level of a specific psychological need by a delta amount.
     This is typically called internally when the system detects need satisfaction or deprivation.
     """
     try:
@@ -339,21 +343,28 @@ async def update_need_level(
         user = await user_service.get_user_profile(user_id)
         if not user:
             raise HTTPException(status_code=404, detail=f"User {user_id} not found")
-        
+
         # Update need level
-        updated_need = await personality_engine.update_need_level(
+        success = await personality_engine.update_need_level(
             user_id=user_id,
             need_type=need_type,
-            new_level=new_level
+            level_delta=level_delta
         )
-        
-        if not updated_need:
+
+        if not success:
             raise HTTPException(status_code=404, detail=f"Need '{need_type}' not found for user {user_id}")
-        
-        logger.info(f"Need '{need_type}' updated to {new_level:.2f} for user {user_id}")
-        
+
+        # Fetch updated need to return
+        needs = await personality_engine.get_user_needs(user_id)
+        updated_need = next((n for n in needs if n.need_type == need_type), None)
+
+        if not updated_need:
+            raise HTTPException(status_code=404, detail=f"Need '{need_type}' not found after update")
+
+        logger.info(f"Need '{need_type}' updated by {level_delta:+.2f} for user {user_id}")
+
         return updated_need
-        
+
     except UserNotFoundError:
         raise HTTPException(status_code=404, detail=f"User {user_id} not found")
     except PersonalityEngineError as e:
@@ -385,7 +396,7 @@ async def get_personality_stability(
         return {
             "user_id": user_id,
             "stability_metrics": stability_metrics,
-            "timestamp": datetime.utcnow()
+            "timestamp": datetime.now(timezone.utc)
         }
         
     except UserNotFoundError:
@@ -426,7 +437,7 @@ async def get_emotional_state(
             "user_id": user_id,
             "current_pad": current_pad,
             "emotion_label": emotion_label,
-            "timestamp": datetime.utcnow()
+            "timestamp": datetime.now(timezone.utc)
         }
         
     except UserNotFoundError:

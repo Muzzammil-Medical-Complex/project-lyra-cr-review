@@ -163,24 +163,24 @@ async def clean_test_user(test_db):
     test_user_id = "test_user_isolated_12345"
     
     # Clean any existing test data
-    await test_db.execute("DELETE FROM personality_state WHERE user_id = %s;", (test_user_id,))
-    await test_db.execute("DELETE FROM interactions WHERE user_id = %s;", (test_user_id,))
-    await test_db.execute("DELETE FROM quirks WHERE user_id = %s;", (test_user_id,))
-    await test_db.execute("DELETE FROM needs WHERE user_id = %s;", (test_user_id,))
-    await test_db.execute("DELETE FROM user_profiles WHERE user_id = %s;", (test_user_id,))
-    await test_db.execute("DELETE FROM memory_conflicts WHERE user_id = %s;", (test_user_id,))
-    await test_db.execute("DELETE FROM security_incidents WHERE user_id = %s;", (test_user_id,))
+    await test_db.execute("DELETE FROM personality_state WHERE user_id = $1;", test_user_id)
+    await test_db.execute("DELETE FROM interactions WHERE user_id = $1;", test_user_id)
+    await test_db.execute("DELETE FROM quirks WHERE user_id = $1;", test_user_id)
+    await test_db.execute("DELETE FROM needs WHERE user_id = $1;", test_user_id)
+    await test_db.execute("DELETE FROM user_profiles WHERE user_id = $1;", test_user_id)
+    await test_db.execute("DELETE FROM memory_conflicts WHERE user_id = $1;", test_user_id)
+    await test_db.execute("DELETE FROM security_incidents WHERE user_id = $1;", test_user_id)
     
     yield test_user_id
     
     # Cleanup after test
-    await test_db.execute("DELETE FROM personality_state WHERE user_id = %s;", (test_user_id,))
-    await test_db.execute("DELETE FROM interactions WHERE user_id = %s;", (test_user_id,))
-    await test_db.execute("DELETE FROM quirks WHERE user_id = %s;", (test_user_id,))
-    await test_db.execute("DELETE FROM needs WHERE user_id = %s;", (test_user_id,))
-    await test_db.execute("DELETE FROM user_profiles WHERE user_id = %s;", (test_user_id,))
-    await test_db.execute("DELETE FROM memory_conflicts WHERE user_id = %s;", (test_user_id,))
-    await test_db.execute("DELETE FROM security_incidents WHERE user_id = %s;", (test_user_id,))
+    await test_db.execute("DELETE FROM personality_state WHERE user_id = $1;", test_user_id)
+    await test_db.execute("DELETE FROM interactions WHERE user_id = $1;", test_user_id)
+    await test_db.execute("DELETE FROM quirks WHERE user_id = $1;", test_user_id)
+    await test_db.execute("DELETE FROM needs WHERE user_id = $1;", test_user_id)
+    await test_db.execute("DELETE FROM user_profiles WHERE user_id = $1;", test_user_id)
+    await test_db.execute("DELETE FROM memory_conflicts WHERE user_id = $1;", test_user_id)
+    await test_db.execute("DELETE FROM security_incidents WHERE user_id = $1;", test_user_id)
 
 
 @pytest.fixture

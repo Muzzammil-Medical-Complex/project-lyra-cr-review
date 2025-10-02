@@ -57,8 +57,13 @@ class ImportanceScorer:
             if self.redis_client:
                 try:
                     cached_score = await self.redis_client.get(cache_key)
-                    if cached_score:
-                        score = float(cached_score)
+                    if cached_score is not None:
+                        # Decode bytes if needed
+                        if isinstance(cached_score, (bytes, bytearray)):
+                            cached_str = cached_score.decode("utf-8", errors="ignore")
+                        else:
+                            cached_str = str(cached_score)
+                        score = float(cached_str)
                         self.logger.debug(f"Retrieved cached importance score: {score}")
                         return score
                 except Exception as e:
@@ -208,14 +213,15 @@ Output only a single number between 0.0 and 1.0:"""
                 score += 0.15
         
         # Personal disclosure indicators
+        content_lower = content.lower()
         personal_indicators = [
-            'I feel', 'I think', 'I believe', 'my opinion', 'in my experience',
+            'i feel', 'i think', 'i believe', 'my opinion', 'in my experience',
             'personally', 'to me', 'for me', 'my family', 'my friends', 'my life',
-            'I want', 'I need', 'I like', 'I dislike', 'I prefer'
+            'i want', 'i need', 'i like', 'i dislike', 'i prefer'
         ]
-        
+
         for indicator in personal_indicators:
-            if indicator in content.lower():
+            if indicator in content_lower:
                 score += 0.05
         
         # Uniqueness based on length and word count

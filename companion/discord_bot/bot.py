@@ -174,9 +174,9 @@ class CompanionBot(commands.Bot):
                         error_msg = await handle_error(e, message)
                         await message.channel.send(error_msg)
                     finally:
-                        # Remove any temporary reactions
+                        # Remove only our temporary hourglass reaction (if present)
                         try:
-                            await message.clear_reactions()
+                            await message.remove_reaction("⏳", self.user)
                         except discord.DiscordException:
                             pass  # Ignore Discord API errors (message deleted, no permission, etc.)
             finally:

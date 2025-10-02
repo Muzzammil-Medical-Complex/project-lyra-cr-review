@@ -280,17 +280,22 @@ class AppraisalEngine:
             }}
             """
             # Set a reasonable timeout for LLM requests (e.g., 5 seconds)
-            response = await asyncio.wait_for(
-                self.groq.generate_text(prompt, max_tokens=100),
+            completion = await asyncio.wait_for(
+                self.groq.chat_completion(
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=100,
+                    temperature=0.3
+                ),
                 timeout=5.0
             )
-            
+
             # Parse the response JSON
             import json
             import re
-            
+
             # Extract JSON from response
-            json_match = re.search(r'\{.*\}', response, re.DOTALL)
+            response_text = completion["choices"][0]["message"]["content"]
+            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
             if json_match:
                 response_json = json.loads(json_match.group())
                 return PADState(

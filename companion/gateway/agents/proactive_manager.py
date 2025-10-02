@@ -138,8 +138,9 @@ class ProactiveManager:
                 max_excess = 1.0 - need.trigger_threshold
                 urgency = (excess / max_excess) if max_excess > 0 else 1.0
 
-                # Weight by need type and proactive weight
-                weighted_urgency = urgency * need_weights.get(need.need_type, 0.1) * need.proactive_weight
+                # Weight by need type and proactive weight (fallback to 1.0 if not present)
+                proactive_weight = getattr(need, 'proactive_weight', 1.0)
+                weighted_urgency = urgency * need_weights.get(need.need_type, 0.1) * proactive_weight
                 total_urgency += weighted_urgency
 
         return min(1.0, total_urgency)

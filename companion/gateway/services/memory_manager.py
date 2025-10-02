@@ -133,6 +133,7 @@ class MemoryManager:
                 id=memory_id,
                 vector=embedding_vector,
                 payload={
+                    "user_id": user_id,
                     "content": content,
                     "memory_type": memory_type,
                     "importance_score": importance_score,
@@ -339,12 +340,13 @@ class MemoryManager:
                 try:
                     results = await asyncio.get_event_loop().run_in_executor(
                         None,
-                        self.qdrant.search,
-                        collection_name,
-                        query_vector,
-                        candidate_count,
-                        SearchParams(exact=False),
-                        0.3  # Score threshold
+                        lambda cname=collection_name: self.qdrant.search(
+                            collection_name=cname,
+                            query_vector=query_vector,
+                            limit=candidate_count,
+                            score_threshold=0.3,
+                            search_params=SearchParams(exact=False)
+                        )
                     )
                     
                     for result in results:

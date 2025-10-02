@@ -292,7 +292,7 @@ class QueryExecutor:
             query_stripped = re.sub(r'--.*?$', '', query_stripped, flags=re.MULTILINE)
             query_stripped = query_stripped.strip().upper()
 
-            if query_stripped.startswith('SELECT') or 'SELECT' in query_stripped:
+            if query_stripped.startswith('SELECT'):
                 return await connection.fetch(query, *(params or ()))
             elif query_stripped.startswith('INSERT') and 'RETURNING' in query_stripped:
                 return await connection.fetchrow(query, *(params or ()))

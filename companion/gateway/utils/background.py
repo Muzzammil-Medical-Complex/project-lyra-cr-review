@@ -155,8 +155,8 @@ class BackgroundTaskManager:
     async def _check_database_health(self) -> bool:
         """Check if the database is accessible."""
         try:
-            await self.db.health_check()
-            return True
+            ok = await self.db.health_check()
+            return bool(ok)
         except Exception as e:
             self.logger.debug(f"Database health check failed: {e}")
             return False
@@ -271,19 +271,16 @@ class BackgroundTaskManager:
         # Additional cleanup can go here
         self.logger.info("Background task manager shutdown completed")
 
-from datetime import datetime, timezone
-
-     async def health_check(self) -> Dict[str, Any]:
-         """Perform a comprehensive health check of background services."""
-         health_info = {
+    async def health_check(self) -> Dict[str, Any]:
+        """Perform a comprehensive health check of background services."""
+        health_info = {
             'timestamp': datetime.now(timezone.utc),
-             'running_tasks_count': len(self.running_tasks),
-             'background_processes_count': len(self.background_processes),
-             'shutdown_requested': self.shutdown_requested,
-             'individual_checks': await self.run_health_checks()
-         }
-         
-         return health_info
+            'running_tasks_count': len(self.running_tasks),
+            'background_processes_count': len(self.background_processes),
+            'shutdown_requested': self.shutdown_requested,
+            'individual_checks': await self.run_health_checks(),
+        }
+        return health_info
 
     async def get_task_stats(self) -> Dict[str, Any]:
         """Get statistics about running background tasks."""
@@ -305,14 +302,11 @@ from datetime import datetime, timezone
                     stats['failed_tasks'] += 1
             else:
                 stats['running_tasks'] += 1
-                
-            # Record task name if available
+
             # Record task name if available
             try:
                 stats['task_names'].append(task._coro.__name__)
-            except (AttributeError, Exception):
-                stats['task_names'].append('unknown')
-            else:
+            except Exception:
                 stats['task_names'].append('unknown')
         
         return stats

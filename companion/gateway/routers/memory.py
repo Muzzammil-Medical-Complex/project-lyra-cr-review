@@ -47,9 +47,6 @@ async def search_memories(
             query=query.text,
             k=query.k or 5,
             memory_type=query.memory_type,
-            time_range_start=query.time_range_start,
-            time_range_end=query.time_range_end,
-            min_importance=query.min_importance,
             lambda_param=query.lambda_param or 0.7
         )
         

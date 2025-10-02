@@ -305,8 +305,13 @@ class SchedulerService:
         
         # Check database connectivity
         try:
-            await self.services.db.health_check()
-            health['components']['database'] = 'healthy'
+            db_ok = await self.services.db.health_check()
+            if db_ok:
+                health['components']['database'] = 'healthy'
+            else:
+                health['components']['database'] = 'unhealthy'
+                health['healthy'] = False
+                health['issues'].append("Database health check reported unavailable")
         except Exception as e:
             health['healthy'] = False
             health['issues'].append(f"Database health check failed: {e}")
@@ -327,12 +332,14 @@ class SchedulerService:
         
         return health
     
-    async def _send_proactive_message(self, user_id: str, message: str):
+    async def _send_proactive_message(self, user_id: str, message: str, trigger_reason: str):
         """Send a proactive message to a user through the appropriate channel."""
         try:
             # In a real implementation, this would send the message through Discord or other channels
             # For now, we'll log it and assume a service handles the actual sending
-            self.logger.info(f"Sending proactive message to {user_id}: {message[:50]}...")
+            self.logger.info(
+                f"Sending proactive message to {user_id}: {message[:50]}... (reason: {trigger_reason})"
+            )
             
             # Example implementation would call discord_sender or similar service
             # await self.services.discord_sender.send_proactive_message(user_id, message)

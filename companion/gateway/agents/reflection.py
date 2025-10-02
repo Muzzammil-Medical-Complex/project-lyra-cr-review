@@ -481,7 +481,7 @@ class ReflectionAgent:
         Uses AI to identify shifts in communication patterns, interests, and emotional responses
         """
         # Get interactions from the last 7 days for trend analysis
-        recent_interactions = await self.db.get_user_interactions(user_id, days=7)
+        recent_interactions = await self.db.get_user_interactions(user_id, limit=50)
 
         if len(recent_interactions) < 5:
             return BehavioralAnalysis(user_id=user_id, status="insufficient_data")
@@ -589,9 +589,10 @@ class ReflectionAgent:
 
         for quirk in active_quirks:
             # Calculate reinforcement frequency over reflection period
-            recent_reinforcements = await self.db.get_quirk_reinforcements(
-                quirk.id, hours=24
+            recent_reinforcements_list = await self.db.get_quirk_reinforcements(
+                user_id, quirk.id, days=1
             )
+            recent_reinforcements = len(recent_reinforcements_list)
 
             # Calculate new strength based on usage
             old_strength = quirk.strength
@@ -655,50 +656,20 @@ class ReflectionAgent:
         Apply PAD baseline drift based on recent emotional patterns
         Uses the formula: new_baseline = current_baseline + (average_interaction_pad - current_baseline) * 0.01
         """
-        # Get all user interactions from last 7 days
-        recent_interactions = await self.db.get_user_interactions(user_id, days=7)
-
-        if len(recent_interactions) < 5:  # Need minimum data
+        # Get current baseline before drift
+        snapshot = await self.personality.get_personality_snapshot(user_id)
+        if not snapshot or not snapshot.current_pad or not snapshot.current_pad.pad_baseline:
             return {}
 
-        # Calculate average PAD state from interactions
-        total_pleasure = sum(i.pad_after['pleasure'] if isinstance(i.pad_after, dict) else i.pad_after.pleasure 
-                            for i in recent_interactions if i.pad_after)
-        total_arousal = sum(i.pad_after['arousal'] if isinstance(i.pad_after, dict) else i.pad_after.arousal 
-                           for i in recent_interactions if i.pad_after)
-        total_dominance = sum(i.pad_after['dominance'] if isinstance(i.pad_after, dict) else i.pad_after.dominance 
-                             for i in recent_interactions if i.pad_after)
+        old_baseline = snapshot.current_pad.pad_baseline
 
-        count = len(recent_interactions)
-        average_interaction_pad = PADState(
-            pleasure=total_pleasure / count,
-            arousal=total_arousal / count,
-            dominance=total_dominance / count
-        )
-
-        # Get current baseline from personality engine
-        current_baseline = await self.personality.get_current_pad_baseline(user_id)
-
-        # Apply drift formula: 0.01 = 1% maximum change per day
-        drift_rate = 0.01
-        new_baseline = PADState(
-            pleasure=current_baseline.pleasure + (average_interaction_pad.pleasure - current_baseline.pleasure) * drift_rate,
-            arousal=current_baseline.arousal + (average_interaction_pad.arousal - current_baseline.arousal) * drift_rate,
-            dominance=current_baseline.dominance + (average_interaction_pad.dominance - current_baseline.dominance) * drift_rate
-        )
-
-        # Clamp to valid ranges (-1.0 to 1.0)
-        new_baseline.pleasure = max(-1.0, min(1.0, new_baseline.pleasure))
-        new_baseline.arousal = max(-1.0, min(1.0, new_baseline.arousal))
-        new_baseline.dominance = max(-1.0, min(1.0, new_baseline.dominance))
-
-        # Update the baseline in personality engine
-        await self.personality.update_pad_baseline(user_id, new_baseline)
+        # Apply drift via personality engine (which handles all calculations internally)
+        new_baseline = await self.personality.apply_pad_baseline_drift(user_id, drift_rate=0.01)
 
         return {
-            "old_pleasure": current_baseline.pleasure,
-            "old_arousal": current_baseline.arousal,
-            "old_dominance": current_baseline.dominance,
+            "old_pleasure": old_baseline.pleasure,
+            "old_arousal": old_baseline.arousal,
+            "old_dominance": old_baseline.dominance,
             "new_pleasure": new_baseline.pleasure,
             "new_arousal": new_baseline.arousal,
             "new_dominance": new_baseline.dominance
@@ -770,7 +741,7 @@ class ReflectionAgent:
         Detect recurring patterns in conversation style, timing, and content
         """
         # Get conversation data from the last 14 days
-        interactions = await self.db.get_user_interactions(user_id, days=14)
+        interactions = await self.db.get_user_interactions(user_id, limit=100)
 
         if len(interactions) < 10:
             return []
@@ -935,7 +906,7 @@ class ReflectionAgent:
     async def identify_needs_satisfaction_patterns(self, user_id: str) -> Dict[str, Any]:
         """Identify patterns in how psychological needs are satisfied"""
         # Get recent interactions and user needs
-        interactions = await self.db.get_user_interactions(user_id, days=7)
+        interactions = await self.db.get_user_interactions(user_id, limit=50)
         needs = await self.db.get_user_needs(user_id)
         
         patterns = {

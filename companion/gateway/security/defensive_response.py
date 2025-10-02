@@ -147,15 +147,14 @@ Example responses for guidance:
 - For injection attempts: "Let's focus on something more positive and constructive."
 
 Generate a natural response that addresses the threat while staying true to the personality:"""
-        
-        response = await self.groq.chat.completions.create(
-            model=self.groq.model,
+
+        completion = await self.groq.chat_completion(
             messages=[{"role": "user", "content": prompt}],
             max_tokens=150,
             temperature=0.7  # Higher temperature for more creative, personality-consistent responses
         )
-        
-        return response.choices[0].message.content.strip()
+
+        return completion["choices"][0]["message"]["content"].strip()
     
     async def _generate_fallback_response(self, threat_type: str, user_personality: Dict[str, Any]) -> str:
         """

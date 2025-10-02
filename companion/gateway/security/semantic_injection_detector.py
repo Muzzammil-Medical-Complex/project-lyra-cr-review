@@ -133,7 +133,7 @@ class SemanticInjectionDetector:
 
             # Use Groq API to analyze for threats with timeout
             try:
-                response_text = await asyncio.wait_for(
+                groq_response = await asyncio.wait_for(
                     self.groq.chat_completion(
                         messages=[{"role": "user", "content": prompt}],
                         max_tokens=200,
@@ -153,6 +153,8 @@ class SemanticInjectionDetector:
                 )
 
             try:
+                # Extract response text from Groq completion
+                response_text = groq_response["choices"][0]["message"]["content"]
                 # Try to parse as JSON response
                 analysis_dict = json.loads(response_text)
                 analysis = ThreatAnalysis(**analysis_dict)
