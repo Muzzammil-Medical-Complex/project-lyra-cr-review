@@ -45,10 +45,6 @@ class SchedulerService:
         # Start the scheduler
         self.scheduler.start()
         self.logger.info("Scheduler initialized and started")
-        
-        # Start the scheduler
-        self.scheduler.start()
-        self.logger.info("Scheduler initialized and started")
     
     async def _add_reflection_job(self):
         """Add the nightly reflection job."""
@@ -162,8 +158,16 @@ class SchedulerService:
             active_users = await self.services.db.get_active_users_for_proactive_check()
             
             initiated_count = 0
+            # Track last proactive message time per user
+            cooldown_hours = 4  # Minimum hours between proactive messages
+            
             for user_id in active_users:
                 try:
+                    # Check if user was recently sent a proactive message
+                    last_proactive = await self.services.db.get_last_proactive_message_time(user_id)
+                    if last_proactive and (datetime.utcnow() - last_proactive).total_seconds() < cooldown_hours * 3600:
+                        continue
+                    
                     if await proactive_manager.should_initiate_conversation(user_id):
                         # Generate and send proactive message
                         score = await proactive_manager.calculate_proactive_score(user_id)
@@ -246,7 +250,7 @@ class SchedulerService:
                         # Apply decay rate based on time elapsed
                         hours_since_update = 1  # Assuming hourly job
                         decay_amount = need.decay_rate * hours_since_update
-                        new_level = min(1.0, need.current_level + decay_amount)
+                        new_level = max(0.0, need.current_level - decay_amount)
                         
                         # Update the need level
                         await self.services.db.update_need_level(user_id, need.need_type, new_level)

@@ -245,9 +245,17 @@ class DatabaseManager:
         """Get the last proactive conversation for a user."""
         query = """
         SELECT * FROM interactions
-        WHERE is_proactive = true
+        WHERE user_id = $1 AND is_proactive = true
         ORDER BY timestamp DESC LIMIT 1
         """
+        result = await self.execute_user_query(user_id, query, ())
+        return result[0] if result else None
+
+    async def get_recent_interaction_stats(self, user_id: str, days: int = 7):
+        """Get recent interaction statistics for a user."""
+        # Validate days parameter
+        days = int(days)
+
         query = """
         SELECT 
             COUNT(*) as total_interactions,

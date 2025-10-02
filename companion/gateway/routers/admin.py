@@ -207,6 +207,7 @@ async def migrate_user_memories(
         }
     except Exception as e:
         logger.error(f"Error migrating memories from {source_user_id} to {target_user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.put("/users/{user_id}/status", response_model=UserProfile)

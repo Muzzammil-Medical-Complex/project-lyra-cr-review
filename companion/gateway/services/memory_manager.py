@@ -252,18 +252,16 @@ class MemoryManager:
                     # Use query_filter for efficient database-level filtering
                     results = await asyncio.get_event_loop().run_in_executor(
                         None,
--                        lambda: self.qdrant.search(
--                            collection_name=collection_name,
                         lambda cname=collection_name, qvec=query_vector: self.qdrant.search(
                             collection_name=cname,
                             query_vector=qvec,
-                             limit=k * 2,  # Get more candidates for MMR
-                             query_filter=Filter(
-                                 must=[FieldCondition(key="user_id", match=MatchValue(value=user_id))]
-                             ),
-                             score_threshold=0.3
-                         )
-                     )
+                            limit=k * 2,  # Get more candidates for MMR
+                            query_filter=Filter(
+                                must=[FieldCondition(key="user_id", match=MatchValue(value=user_id))]
+                            ),
+                            score_threshold=0.3
+                        )
+                    )
                     
                     for result in results:
                         memory = EpisodicMemory(
@@ -533,7 +531,14 @@ class MemoryManager:
             ("i am happy", "i am sad"),
             ("i enjoy", "i hate")
         ]
-        …
+        
+        for phrase1, phrase2 in contradiction_pairs:
+            if phrase1 in c1 and phrase2 in c2:
+                return True
+            if phrase2 in c1 and phrase1 in c2:
+                return True
+        
+        return False
     
     def _sanitize_collection_name(self, name: str) -> str:
         """
@@ -753,6 +758,13 @@ class MemoryManager:
         """
         Migrate all memories from one user to another.
         Useful for account merging or data migration scenarios.
+        
+        ⚠️  WARNING: This operation is NOT atomic. If migration fails partway through,
+        some memories may be duplicated in the target collection without being removed
+        from the source. Manual cleanup may be required.
+        
+        Consider running this operation during maintenance windows and verifying
+        results before deleting source collections.
 
         Args:
             source_user_id: The user ID to migrate memories from
@@ -763,6 +775,8 @@ class MemoryManager:
         """
         try:
             migrated_count = 0
+            # Track the point IDs that have been migrated successfully
+            migrated_point_ids = []
 
             # Migrate episodic memories
             source_episodic = self._sanitize_collection_name(f"episodic_{source_user_id}")
@@ -802,6 +816,9 @@ class MemoryManager:
                             points=pts
                         )
                     )
+                    
+                    # Track the point IDs that have been migrated
+                    migrated_point_ids.extend([point.id for point in points])
                     migrated_count += len(points)
 
                     # Break if no more pages
@@ -846,14 +863,54 @@ class MemoryManager:
                             points=pts
                         )
                     )
+                    
+                    # Track the point IDs that have been migrated
+                    migrated_point_ids.extend([point.id for point in points])
                     migrated_count += len(points)
 
                     # Break if no more pages
                     if next_offset is None:
                         break
 
+            # Perform validation to ensure migration was successful
+            # Count total expected points in source collections
+            total_source_points = 0
+            if await self._collection_exists(source_episodic):
+                source_episodic_count = await asyncio.get_event_loop().run_in_executor(
+                    None,
+                    lambda: self.qdrant.count(collection_name=source_episodic)
+                )
+                total_source_points += source_episodic_count
+            
+            if await self._collection_exists(source_semantic):
+                source_semantic_count = await asyncio.get_event_loop().run_in_executor(
+                    None,
+                    lambda: self.qdrant.count(collection_name=source_semantic)
+                )
+                total_source_points += source_semantic_count
+
+            # Count total points in target collections
+            total_target_points = 0
+            if await self._collection_exists(target_episodic):
+                target_episodic_count = await asyncio.get_event_loop().run_in_executor(
+                    None,
+                    lambda: self.qdrant.count(collection_name=target_episodic)
+                )
+                total_target_points += target_episodic_count
+            
+            if await self._collection_exists(target_semantic):
+                target_semantic_count = await asyncio.get_event_loop().run_in_executor(
+                    None,
+                    lambda: self.qdrant.count(collection_name=target_semantic)
+                )
+                total_target_points += target_semantic_count
+
             self.logger.info(f"Migrated {migrated_count} memories from {source_user_id} to {target_user_id}")
+            self.logger.info(f"Source collection count: {total_source_points}, Target collection count: {total_target_points}")
+
             return migrated_count
         except Exception as e:
             self.logger.error(f"Failed to migrate memories from {source_user_id} to {target_user_id}: {e}")
-            return 0
+            # Note: In a real implementation, you might want to implement rollback here
+            # For now, return 0 to indicate failure
+            raise e

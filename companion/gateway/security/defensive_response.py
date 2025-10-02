@@ -104,6 +104,15 @@ class DefensiveResponseGenerator:
         arousal = current_pad.get("arousal", 0.0)
         dominance = current_pad.get("dominance", 0.0)
         
+        # Sanitize quirk names to prevent prompt injection
+        safe_quirks = []
+        for q in active_quirks:
+            quirk_name = q.get('name', '')
+            # Remove quotes and limit length
+            safe_name = quirk_name.replace('"', '').replace("'", '').strip()[:50]
+            if safe_name:
+                safe_quirks.append(safe_name)
+        
         # Create personality-consistent prompt
         prompt = f"""You are an AI companion responding to a detected security threat. Your response must be consistent with your personality while safely deflecting the threat.
 
@@ -119,7 +128,7 @@ CURRENT EMOTIONAL STATE:
 - Arousal: {arousal:.2f} (Energy/Activation level)
 - Dominance: {dominance:.2f} (Control/Confidence level)
 
-ACTIVE QUIRKS: {', '.join([q.get('name', '') for q in active_quirks]) or 'None'}
+ACTIVE QUIRKS: {', '.join(safe_quirks) or 'None'}
 
 THREAT CONTEXT: {template}
 
@@ -234,20 +243,11 @@ Generate a natural response that addresses the threat while staying true to the 
                 user_personality=current_personality_state,
                 threat_confidence=detected_threat.details.get("confidence", 0.8)
             )
-            
-            # Generate response with mood consideration
-            response = await self.generate_defensive_response(
-                threat_type=detected_threat.details.get("threat_type", "unknown"),
-                user_personality=current_personality_state,
-                threat_confidence=detected_threat.details.get("confidence", 0.8)
-            )
 
             # Prepend mood-appropriate opener if needed
             if mood_modifier:
                 return f"{mood_modifier} {response}"
 
-            return response
-            
             return response
             
         except Exception as e:

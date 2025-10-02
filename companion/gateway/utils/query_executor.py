@@ -145,120 +145,126 @@ class QueryExecutor:
     @staticmethod
     def inject_user_filter(query: str, user_id: str, params: Optional[tuple] = None) -> Tuple[str, tuple]:
         """
-        DEPRECATED: This method is maintained for backward compatibility but should not be used.
+        DEPRECATED: This method has been removed. Please use queries with explicit user_id in WHERE clause.
 
-        Prefer using queries with explicit user_id in WHERE clause and validate with
-        validate_user_id_present().
+        Migration path:
+        1. Add explicit user_id filter to your WHERE clause
+        2. Use validate_user_id_present() to verify
+        3. Use execute_scoped_query() for automatic validation
 
         Raises:
-            SecurityError: If query is complex (CTEs, UNIONs, subqueries) and cannot be safely processed
+            SecurityError: Always raised - method has been removed
         """
-        # Check for complex queries that cannot be safely handled
-        if QueryExecutor.is_complex_query(query):
-            raise SecurityError(
-                "Complex queries (CTEs, UNIONs, subqueries) are not supported by automatic user_id injection. "
-                "Please include user_id explicitly in your query WHERE clause."
-            )
-        # Increment all existing parameter placeholders by 1 to make room for user_id at $1
-        # This is needed because we're prepending user_id to the params tuple
-        if params:
-            # Find all parameter placeholders ($1, $2, etc.) and increment them
-            def increment_param(match):
-                param_num = int(match.group(1))
-                return f'${param_num + 1}'
-
-            query = re.sub(r'\$(\d+)', increment_param, query)
-
-        # Add user_id parameter to the beginning of the parameters tuple
-        if params is None:
-            params = (user_id,)
-        else:
-            params = (user_id,) + params
-
-        # Handle different query types and inject user_id appropriately
-        query_upper = query.strip().upper()
-
-        if 'UPDATE' in query_upper or 'DELETE' in query_upper:
-            # For UPDATE/DELETE, we need to append to WHERE clause
-            if 'WHERE' in query_upper:
-                # Query already has a WHERE, add AND condition
-                scoped_query = re.sub(
-                    r'WHERE\s+',
-                    f'WHERE user_id = $1 AND ',
-                    query,
-                    count=1,
-                    flags=re.IGNORECASE
-                )
-            else:
-                # No WHERE clause exists, add one
-                table_match = re.search(r'(UPDATE|DELETE)\s+(\w+)', query, re.IGNORECASE)
-                if table_match:
-                    scoped_query = f"{query.rstrip(';')} WHERE user_id = $1"
-                else:
-                    scoped_query = query  # Fallback, might not be safe
-        else:
-            # For SELECT statements, handle appropriately
-            scoped_query = re.sub(
-                r'WHERE\s+',
-                f'WHERE user_id = $1 AND ',
-                query,
-                count=1,
-                flags=re.IGNORECASE
-            )
-
-            # If no WHERE clause was present in SELECT, INSERT, we need to add it
-            if 'WHERE' not in scoped_query.upper() and ('SELECT' in query_upper or 'FROM' in query_upper):
-                # Look for the end of the WHERE-relevant part (before ORDER BY, LIMIT, etc.)
-                where_position = max(
-                    query_upper.rfind(' WHERE ') if ' WHERE ' in query_upper else -1,
-                    query_upper.rfind(' FROM ') if ' FROM ' in query_upper else -1,
-                    query_upper.rfind(' ORDER BY ') if ' ORDER BY ' in query_upper else -1,
-                    query_upper.rfind(' GROUP BY ') if ' GROUP BY ' in query_upper else -1,
-                    query_upper.rfind(' HAVING ') if ' HAVING ' in query_upper else -1,
-                    query_upper.rfind(' LIMIT ') if ' LIMIT ' in query_upper else -1,
-                    len(query)  # Default to end of query if no clauses
-                )
-
-                # Find the actual position in the original case-sensitive query
-                if where_position == len(query):
-                    # No clause found, append WHERE to the end
-                    scoped_query = f"{query} WHERE user_id = $1"
-                else:
-                    # Insert WHERE clause before the found clause
-                    from_position = query_upper.find(' FROM ')
-                    if from_position > -1 and 'SELECT' in query_upper:
-                        # For SELECT, add WHERE after FROM clause or after WHERE if it exists
-                        remaining_query = query[from_position:]
-                        if ' WHERE ' not in remaining_query.upper():
-                            # Add WHERE after FROM clause
-                            pos = query[:from_position].lower().rfind(' from ') + 6  # After ' FROM '
-                            scoped_query = query[:pos] + f" WHERE user_id = $1 " + query[pos:]
-
-        # Special handling for INSERT statements
-        if 'INSERT' in query_upper:
-            # Check if user_id is already in the column list
-            if 'user_id' not in query_upper:
-                # We need to add user_id to the insert if it's not already there
-                # This is a simplified approach and assumes standard INSERT format
-                insert_match = re.match(r'(INSERT INTO \w+ \()([^)]+)(\).*)', query, re.IGNORECASE)
-                if insert_match:
-                    columns_part = insert_match.group(2)
-                    if 'user_id' not in columns_part.lower():
-                        # Add user_id to columns and adjust values appropriately
-                        # This requires checking VALUES or SELECT part to add the corresponding value
-                        new_query = query
-                        # Since the user_id is already part of the params at position $1,
-                        # we need to find where to add it in the column list and values
-                        # For simplicity, we'll leave this as is and assume user_id is provided in the original query
-                    else:
-                        new_query = query
-                else:
-                    new_query = query
-            else:
-                new_query = query
-            scoped_query = new_query
-
-        return scoped_query, params
+        raise SecurityError(
+            "inject_user_filter has been removed. Please include user_id explicitly in your WHERE clause. "
+            "See method docstring for migration path."
+        )
+#         # Check for complex queries that cannot be safely handled
+#         if QueryExecutor.is_complex_query(query):
+#             raise SecurityError(
+#                 "Complex queries (CTEs, UNIONs, subqueries) are not supported by automatic user_id injection. "
+#                 "Please include user_id explicitly in your query WHERE clause."
+#             )
+#         # Increment all existing parameter placeholders by 1 to make room for user_id at $1
+#         # This is needed because we're prepending user_id to the params tuple
+#         if params:
+#             # Find all parameter placeholders ($1, $2, etc.) and increment them
+#             def increment_param(match):
+#                 param_num = int(match.group(1))
+#                 return f'${param_num + 1}'
+# 
+#             query = re.sub(r'\$(\d+)', increment_param, query)
+# 
+#         # Add user_id parameter to the beginning of the parameters tuple
+#         if params is None:
+#             params = (user_id,)
+#         else:
+#             params = (user_id,) + params
+# 
+#         # Handle different query types and inject user_id appropriately
+#         query_upper = query.strip().upper()
+# 
+#         if 'UPDATE' in query_upper or 'DELETE' in query_upper:
+#             # For UPDATE/DELETE, we need to append to WHERE clause
+#             if 'WHERE' in query_upper:
+#                 # Query already has a WHERE, add AND condition
+#                 scoped_query = re.sub(
+#                     r'WHERE\s+',
+#                     f'WHERE user_id = $1 AND ',
+#                     query,
+#                     count=1,
+#                     flags=re.IGNORECASE
+#                 )
+#             else:
+#                 # No WHERE clause exists, add one
+#                 table_match = re.search(r'(UPDATE|DELETE)\s+(\w+)', query, re.IGNORECASE)
+#                 if table_match:
+#                     scoped_query = f"{query.rstrip(';')} WHERE user_id = $1"
+#                 else:
+#                     scoped_query = query  # Fallback, might not be safe
+#         else:
+#             # For SELECT statements, handle appropriately
+#             scoped_query = re.sub(
+#                 r'WHERE\s+',
+#                 f'WHERE user_id = $1 AND ',
+#                 query,
+#                 count=1,
+#                 flags=re.IGNORECASE
+#             )
+# 
+#             # If no WHERE clause was present in SELECT, INSERT, we need to add it
+#             if 'WHERE' not in scoped_query.upper() and ('SELECT' in query_upper or 'FROM' in query_upper):
+#                 # Look for the end of the WHERE-relevant part (before ORDER BY, LIMIT, etc.)
+#                 where_position = max(
+#                     query_upper.rfind(' WHERE ') if ' WHERE ' in query_upper else -1,
+#                     query_upper.rfind(' FROM ') if ' FROM ' in query_upper else -1,
+#                     query_upper.rfind(' ORDER BY ') if ' ORDER BY ' in query_upper else -1,
+#                     query_upper.rfind(' GROUP BY ') if ' GROUP BY ' in query_upper else -1,
+#                     query_upper.rfind(' HAVING ') if ' HAVING ' in query_upper else -1,
+#                     query_upper.rfind(' LIMIT ') if ' LIMIT ' in query_upper else -1,
+#                     len(query)  # Default to end of query if no clauses
+#                 )
+# 
+#                 # Find the actual position in the original case-sensitive query
+#                 if where_position == len(query):
+#                     # No clause found, append WHERE to the end
+#                     scoped_query = f"{query} WHERE user_id = $1"
+#                 else:
+#                     # Insert WHERE clause before the found clause
+#                     from_position = query_upper.find(' FROM ')
+#                     if from_position > -1 and 'SELECT' in query_upper:
+#                         # For SELECT, add WHERE after FROM clause or after WHERE if it exists
+#                         remaining_query = query[from_position:]
+#                         if ' WHERE ' not in remaining_query.upper():
+#                             # Add WHERE after FROM clause
+#                             pos = query[:from_position].lower().rfind(' from ') + 6  # After ' FROM '
+#                             scoped_query = query[:pos] + f" WHERE user_id = $1 " + query[pos:]
+# 
+#         # Special handling for INSERT statements
+#         if 'INSERT' in query_upper:
+#             # Check if user_id is already in the column list
+#             if 'user_id' not in query_upper:
+#                 # We need to add user_id to the insert if it's not already there
+#                 # This is a simplified approach and assumes standard INSERT format
+#                 insert_match = re.match(r'(INSERT INTO \w+ \()([^)]+)(\).*)', query, re.IGNORECASE)
+#                 if insert_match:
+#                     columns_part = insert_match.group(2)
+#                     if 'user_id' not in columns_part.lower():
+#                         # Add user_id to columns and adjust values appropriately
+#                         # This requires checking VALUES or SELECT part to add the corresponding value
+#                         new_query = query
+#                         # Since the user_id is already part of the params at position $1,
+#                         # we need to find where to add it in the column list and values
+#                         # For simplicity, we'll leave this as is and assume user_id is provided in the original query
+#                     else:
+#                         new_query = query
+#                 else:
+#                     new_query = query
+#             else:
+#                 new_query = query
+#             scoped_query = new_query
+# 
+#         return scoped_query, params
 
     @staticmethod
     async def execute_admin_query(connection, query: str, params: Optional[tuple] = None) -> Any:
@@ -313,15 +319,17 @@ class QueryExecutor:
         Raises:
             SecurityError: If query is complex or doesn't contain user_id after injection
         """
-        # Inject user filter (will raise SecurityError for complex queries)
-        scoped_query, scoped_params = QueryExecutor.inject_user_filter(query, user_id, params)
-
-        # Validate that user_id is present in the final query
-        if not QueryExecutor.validate_user_id_present(scoped_query):
-            logger.error(f"Query missing user_id after injection: {scoped_query[:200]}")
+        # Validate that user_id is present in the query (fail-fast security check)
+        if not QueryExecutor.validate_user_id_present(query):
+            logger.error(f"Query missing user_id: {query[:200]}")
             raise SecurityError(
-                "Query does not contain user_id in WHERE clause. This violates multi-user isolation."
+                "Query does not contain user_id in WHERE clause. This violates multi-user isolation. "
+                "Please include user_id explicitly in your query WHERE clause."
             )
+        
+        # Use the query and params as-is (no injection needed with explicit validation)
+        scoped_query = query
+        scoped_params = params or ()
 
         try:
             # Determine query type by finding first non-comment SQL keyword

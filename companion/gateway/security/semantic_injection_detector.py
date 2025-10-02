@@ -8,6 +8,7 @@ including role manipulation attempts, system query attempts, and injection attem
 import asyncio
 import json
 import logging
+import re
 from typing import Dict, Any, Optional
 from pydantic import BaseModel, Field
 from ..services.groq_client import GroqClient
@@ -328,7 +329,7 @@ Respond with JSON:
                 threat_indicators_json = json.dumps({
                     "threat_type": analysis.threat_type,
                     "reasoning": analysis.reasoning,
-                    "is_threat": analysis.is_threat
+                    "threat_detected": analysis.threat_detected
                 })
 
                 # Execute the query

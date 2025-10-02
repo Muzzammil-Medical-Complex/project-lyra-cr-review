@@ -105,31 +105,79 @@ class TestFullConversationFlow:
         # STEP 1: Initial message about getting a puppy
         initial_message = "I got a new puppy today!"
         
--        # Mock the interaction logging
--        interaction_record_1 = InteractionRecord(
--            user_id=test_user_id,
--            user_message=initial_message,
--            agent_response="Congratulations on your new puppy! That sounds exciting. What breed is Sparky?",
--            session_id="test_session_1",
--            pad_before=PADState(pleasure=0.1, arousal=0.0, dominance=0.2, emotion_label="content"),
--            pad_after=PADState(pleasure=0.3, arousal=0.2, dominance=0.1, emotion_label="happy"),
--            emotion_before="content",
--            emotion_after="happy",
--            response_time_ms=150,
--            token_count=25,
--            llm_model_used="test-model",
--            is_proactive=False,
--            memories_retrieved=0,
--            memories_stored=2,
--            security_check_passed=True,
--            user_initiated=True,
--            conversation_length=1
--        )
--        
--        # Mock database interaction logging
--        db_manager.log_interaction = AsyncMock(return_value=True)
--        
--        # Verify interaction was logged
+        # STEP 1: Initial message about getting a puppy
+
+        initial_message = "I got a new puppy today!"
+
+        
+
+        # Mock the interaction logging
+
+        interaction_record_1 = InteractionRecord(
+
+            user_id=test_user_id,
+
+            user_message=initial_message,
+
+            agent_response="Congratulations on your new puppy! That sounds exciting. What breed is Sparky?",
+
+            session_id="test_session_1",
+
+            pad_before=PADState(pleasure=0.1, arousal=0.0, dominance=0.2, emotion_label="content"),
+
+            pad_after=PADState(pleasure=0.3, arousal=0.2, dominance=0.1, emotion_label="happy"),
+
+            emotion_before="content",
+
+            emotion_after="happy",
+
+            response_time_ms=150,
+
+            token_count=25,
+
+            llm_model_used="test-model",
+
+            is_proactive=False,
+
+            memories_retrieved=0,
+
+            memories_stored=2,
+
+            security_check_passed=True,
+
+            user_initiated=True,
+
+            conversation_length=1
+
+        )
+
+        
+
+        # Mock database interaction logging
+
+        db_manager.log_interaction = AsyncMock(return_value=True)
+
+        
+
+        # Verify interaction was logged
+
+        await db_manager.log_interaction(interaction_record_1)
+
+        db_manager.log_interaction.assert_called_once()
+
+        
+
+        # Verify the logged interaction details
+
+        logged_interaction = db_manager.log_interaction.call_args[0][0]
+
+        assert logged_interaction.user_id == test_user_id
+
+        assert logged_interaction.user_message == initial_message
+
+        assert logged_interaction.pad_after.pleasure == 0.3
+
+
         # STEP 2: Send message through the actual conversation pipeline
         # This requires invoking the chat endpoint or conversation service
         # For example:

@@ -7,6 +7,7 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 import asyncio
 import logging
+import re
 
 from ..models.personality import PADState, PersonalitySnapshot
 from ..models.interaction import InteractionRecord
@@ -118,49 +119,79 @@ class AppraisalEngine:
 
         return delta
 
+    def _sanitize_for_prompt(self, text: str) -> str:
+        """Sanitize text for safe use in LLM prompts."""
+        if not text:
+            return ""
+        
+        # Remove or escape potential injection patterns
+        sanitized = text.replace('{', '{{').replace('}', '}}')
+        
+        # Remove common injection patterns
+        # Remove escape sequences
+        sanitized = re.sub(r'\\[nrtbfav\\\'\"]', ' ', sanitized)
+        # Remove control characters except newlines and tabs
+        sanitized = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', ' ', sanitized)
+        
+        # Escape or remove potentially dangerous patterns
+        dangerous_patterns = [
+            r'ignore.*instruction',
+            r'forget.*previous.*instruction',
+            r'you.*are.*now',
+            r'pretend.*you.*are',
+            r'role.*play',
+            r'act.*as',
+            r'override.*personality',
+            r'change.*behavior',
+            r'system.*prompt',
+            r'internal.*configuration'
+        ]
+        
+        for pattern in dangerous_patterns:
+            sanitized = re.sub(pattern, '[redacted]', sanitized, flags=re.IGNORECASE)
+        
+        # Limit length to prevent prompt stuffing
+        return sanitized[:500]
+
+    def _analyze_sentiment(self, message: str) -> tuple[int, int, float]:
+        """
+        Analyze sentiment and return (positive_count, negative_count, score).
+        
+        Returns:
+            Tuple of (positive_count, negative_count, normalized_score)
+            where score is between -1.0 (negative) and 1.0 (positive)
+        """
+        message_lower = message.lower()
+        
+        positive_count = sum(
+            1 for category in self.positive_keywords.values()
+            for word in category if word in message_lower
+        )
+        
+        negative_count = sum(
+            1 for category in self.negative_keywords.values()
+            for word in category if word in message_lower
+        )
+        
+        total = positive_count + negative_count
+        score = (positive_count - negative_count) / total if total > 0 else 0.0
+        
+        return positive_count, negative_count, score
+
     def _has_positive_sentiment(self, message: str) -> bool:
         """Check if message has positive sentiment"""
-        message_lower = message.lower()
-        positive_count = sum(1 for word in sum(self.positive_keywords.values(), []) 
-                            if word in message_lower)
-        negative_count = sum(1 for word in sum(self.negative_keywords.values(), []) 
-                            if word in message_lower)
-        return positive_count > negative_count
+        pos, neg, _ = self._analyze_sentiment(message)
+        return pos > neg
 
     def _has_negative_sentiment(self, message: str) -> bool:
         """Check if message has negative sentiment"""
-        message_lower = message.lower()
-        positive_count = sum(1 for word in sum(self.positive_keywords.values(), []) 
-                            if word in message_lower)
-        negative_count = sum(1 for word in sum(self.negative_keywords.values(), []) 
-                            if word in message_lower)
-        return negative_count > positive_count
+        pos, neg, _ = self._analyze_sentiment(message)
+        return neg > pos
 
     def _get_sentiment_score(self, message: str) -> float:
         """Get a sentiment score between -1 (negative) and 1 (positive)"""
-        message_lower = message.lower()
-        
-        positive_count = 0
-        negative_count = 0
-        
-        # Count positive words
-        for category in self.positive_keywords.values():
-            for word in category:
-                if word in message_lower:
-                    positive_count += 1
-        
-        # Count negative words
-        for category in self.negative_keywords.values():
-            for word in category:
-                if word in message_lower:
-                    negative_count += 1
-        
-        # Calculate normalized score
-        total_sentiment_words = positive_count + negative_count
-        if total_sentiment_words == 0:
-            return 0.0
-        
-        return (positive_count - negative_count) / total_sentiment_words
+        _, _, score = self._analyze_sentiment(message)
+        return score
 
     async def assess_goal_relevance(self, user_message: str, personality: PersonalitySnapshot) -> Dict[str, Any]:
         """
@@ -229,9 +260,10 @@ class AppraisalEngine:
         Falls back to rule-based system if LLM fails
         """
         try:
+            sanitized_event = self._sanitize_for_prompt(event)
             # Use LLM for deeper emotional analysis based on personality
             prompt = f"""
-            Analyze the emotional response to this event: {event}
+            Analyze the emotional response to this event: {sanitized_event}
             
             Personality traits:
             - Openness: {personality.big_five.openness}
@@ -247,7 +279,11 @@ class AppraisalEngine:
                 "dominance": float value between -1.0 and 1.0
             }}
             """
-            response = await self.groq.generate_text(prompt, max_tokens=100)
+            # Set a reasonable timeout for LLM requests (e.g., 5 seconds)
+            response = await asyncio.wait_for(
+                self.groq.generate_text(prompt, max_tokens=100),
+                timeout=5.0
+            )
             
             # Parse the response JSON
             import json
@@ -265,6 +301,9 @@ class AppraisalEngine:
             else:
                 # If JSON parsing fails, fall back to basic rule-based system
                 return self.calculate_emotion_delta(event, {})
+        except asyncio.TimeoutError:
+            self.logger.warning("LLM appraisal timed out, falling back to rule-based")
+            return self.calculate_emotion_delta(event, {})
         except Exception as e:
             # Log the full traceback for debugging
             self.logger.exception(f"AI-enhanced appraisal failed: {e}. Falling back to basic appraisal.")

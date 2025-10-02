@@ -93,9 +93,18 @@ def sanitize_and_hash_content(content: str, max_length: int = 200) -> Dict[str, 
     Returns:
         Dict with sanitized_snippet, content_hash, and content_redacted flag
     """
-    # Remove control characters and excessive whitespace
-    sanitized = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', content)
-    sanitized = re.sub(r'\s+', ' ', sanitized).strip()
+    # Remove control characters except newline, tab, and carriage return
+    # Preserve newlines and tabs for multi-line content
+    sanitized = re.sub(r'[\x00-\x08\x0b-\x0c\x0e-\x1f\x7f-\x9f]', '', content)
+    # Normalize excessive whitespace while preserving line breaks
+    lines = sanitized.split('\n')
+    normalized_lines = []
+    for line in lines:
+        # Collapse runs of spaces/tabs within each line
+        normalized_line = re.sub(r'[ \t]+', ' ', line).strip()
+        normalized_lines.append(normalized_line)
+    # Rejoin lines with preserved newlines
+    sanitized = '\n'.join(normalized_lines)
 
     # Truncate to max_length
     if len(sanitized) > max_length:

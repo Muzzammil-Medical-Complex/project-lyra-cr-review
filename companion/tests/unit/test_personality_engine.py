@@ -138,6 +138,17 @@ class TestPersonalityEngine:
         decay_rate = 0.05
         expected_decay = max(0.0, quirk.strength - (time_since_observed * decay_rate))
         
+        # Mock the database update method
+        db_mock.update_quirk_strength = AsyncMock()
+        
+        # Apply decay
+        await personality_engine.decay_quirk(quirk, time_since_observed, decay_rate)
+        
+        # Verify the strength was updated correctly
+        db_mock.update_quirk_strength.assert_called_once_with(
+            quirk.id, expected_decay
+        )
+        
         # This test would need more implementation details from the actual method
         # For now, we verify the structure
         assert expected_decay >= 0.0  # Ensure decay doesn't go below 0
@@ -243,8 +254,9 @@ class TestPersonalityEngine:
         ]
         
         for pad_state, expected_label in test_cases:
-            # The actual mapping would depend on the implementation in PADState.to_emotion_octant()
-            # For this test, we just verify the method exists and is callable
+            # Test the actual emotion octant conversion
             emotion_label = pad_state.to_emotion_octant()
-            # Note: This test requires the PADState class to have the to_emotion_octant method implemented
+            # Verify the method returns a string
             assert isinstance(emotion_label, str)
+            # Verify the returned label matches expected octant
+            assert emotion_label == expected_label

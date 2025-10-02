@@ -10,6 +10,7 @@ import logging
 from ..models.personality import (
     PersonalitySnapshot, PADState, BigFiveTraits, Quirk, PsychologicalNeed
 )
+from ..models.user import UserProfile
 from ..services.personality_engine import PersonalityEngine
 from ..services.user_service import UserService
 from ..database import DatabaseManager

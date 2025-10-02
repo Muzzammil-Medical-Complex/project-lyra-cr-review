@@ -252,6 +252,12 @@ class BackgroundTaskManager:
             )
         except asyncio.TimeoutError:
             self.logger.warning(f"Tasks didn't complete within {timeout}s timeout, forcing shutdown")
+            # Force cancel any remaining tasks
+            for task in self.running_tasks:
+                if not task.done():
+                    task.cancel()
+            # Give a final moment for cancellation to propagate
+            await asyncio.sleep(0.1)
         
         # Shutdown scheduler
         try:

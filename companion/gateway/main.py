@@ -141,24 +141,35 @@ async def lifespan(app: FastAPI):
     # PHASE 1: Core Infrastructure
     logger.info("🚀 Phase 1: Initializing core infrastructure...")
     
-    settings = Settings()
-    services.db = DatabaseManager(settings.database_url)
-    await services.db.initialize()
-    
-    # Initialize Qdrant client for vector database
-    services.qdrant = QdrantClient(url=settings.qdrant_url)
-    logger.info(f"✅ Qdrant client initialized with URL: {settings.qdrant_url}")
-    
-    services.redis = redis.from_url(
-        settings.redis_url,
-        max_connections=settings.redis_max_connections,
-        decode_responses=settings.redis_decode_responses
-    )
     try:
-        await services.redis.ping()
-        logger.info("✅ Redis client initialized and connected")
+        settings = Settings()
+        services.db = DatabaseManager(settings.database_url)
+        await services.db.initialize()
+        
+        # Initialize Qdrant client for vector database
+        services.qdrant = QdrantClient(url=settings.qdrant_url)
+        logger.info(f"✅ Qdrant client initialized with URL: {settings.qdrant_url}")
+        
+        services.redis = redis.from_url(
+            settings.redis_url,
+            max_connections=settings.redis_max_connections,
+            decode_responses=settings.redis_decode_responses
+        )
+        try:
+            await services.redis.ping()
+            logger.info("✅ Redis client initialized and connected")
+        except Exception as e:
+            logger.error(f"❌ Redis connection failed: {e}")
+            raise
     except Exception as e:
-        logger.error(f"❌ Redis connection failed: {e}")
+        logger.error(f"Phase 1 initialization failed: {e}")
+        # Clean up any partially initialized resources
+        if services.db:
+            await services.db.close()
+        if services.qdrant:
+            services.qdrant.close()
+        if services.redis:
+            await services.redis.close()
         raise
     
     # PHASE 2: Utility Services
