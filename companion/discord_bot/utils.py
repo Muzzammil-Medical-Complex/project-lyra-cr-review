@@ -31,7 +31,7 @@ def extract_guild_id(guild: Optional[discord.Guild]) -> Optional[str]:
     return str(guild.id) if guild else None
 
 
-def format_response(response: str, user: Union[User, Member]) -> str:
+def format_response(response: str, _user: Union[User, Member]) -> str:
     """
     Format the AI's response for Discord presentation.
     This may include applying Discord-specific formatting or user mentions.
@@ -73,8 +73,6 @@ def handle_error(
     """
     Handle and format Discord bot errors.
     """
-    error_msg = f"An error occurred: {str(error)}"
-    
     context_str = "unknown"
     if context:
         if hasattr(context, 'command'):
@@ -302,124 +300,4 @@ async def bulk_delete_messages(channel: discord.TextChannel, count: int, check_f
         return len(deleted)
     except discord.Forbidden:
         logger.warning(f"Bot doesn't have permission to delete messages in channel {channel.id}")
-        return 0
-        return False
-
-    return True
-
-
-async def send_safe_message(channel: discord.TextChannel, content: str, **kwargs) -> Optional[discord.Message]:
-    """
-    Safely send a message to a Discord channel with error handling.
-    """
-    try:
-        # Ensure content is within Discord limits
-        if len(content) > 2000:
-            content = content[:1995] + "... [truncated]"
-        
-        return await channel.send(content, **kwargs)
-    except discord.HTTPException as e:
-        logger.error(f"Failed to send message to channel {channel.id}: {e}")
-        return None
-    except Exception as e:
-        logger.error(f"Unexpected error sending message to channel {channel.id}: {e}")
-        return None
-
-
-async def wait_for_user_response(bot, channel: discord.TextChannel, user: discord.User, timeout: int = 60) -> Optional[discord.Message]:
-    """
-    Wait for a response from a specific user in a specific channel.
-    """
-    def check(message):
-        return message.author.id == user.id and message.channel.id == channel.id
-    
-    try:
-        response = await bot.wait_for('message', check=check, timeout=timeout)
-        return response
-    except asyncio.TimeoutError:
-        await channel.send("Timed out waiting for your response.")
-        return None
-
-
-def format_timestamp(timestamp: datetime) -> str:
-    """
-    Format datetime for Discord display.
-    """
-    return timestamp.strftime("%Y-%m-%d %H:%M:%S UTC")
-
-
-def extract_discord_mentions(text: str) -> list[str]:
-    """
-    Extract Discord user mentions from text.
-    """
-    # Pattern to match <@user_id> or <@!user_id> (with nickname)
-    mention_pattern = r'<@!?(\d+)>'
-    user_ids = re.findall(mention_pattern, text)
-    return user_ids
-
-
-def is_valid_discord_id(id_str: str) -> bool:
-    """
-    Check if a string is a valid Discord ID (18-19 digits).
-    """
-    return bool(re.match(r'^\d{18,19}$', id_str))
-
-
-def sanitize_for_discord(text: str) -> str:
-    """
-    Sanitize text for safe use in Discord.
-    Breaks mentions and role pings using zero-width space to prevent unwanted notifications.
-    """
-    # Prevent mentioning @everyone and @here
-    text = text.replace('@everyone', '@ everyone')
-    text = text.replace('@here', '@ here')
-
-    # Break user mentions with zero-width space (prevents pings)
-    text = re.sub(r'<@!?(\d+)>', lambda m: f'<@\u200b{m.group(1)}>', text)
-
-    # Break role mentions with zero-width space (prevents role pings)
-    text = re.sub(r'<@&(\d+)>', lambda m: f'<@&\u200b{m.group(1)}>', text)
-
-    return text
-
-
-def get_user_avatar_url(user: Union[User, Member]) -> Optional[str]:
-    """
-    Get the user's avatar URL.
-    """
-    try:
-        return str(user.avatar.url) if user.avatar else str(user.default_avatar.url)
-    except Exception:
-        return None
-
-def format_duration(seconds: float) -> str:
-    """
-    Format duration in seconds to human-readable format.
-    """
-    if seconds < 60:
-        return f"{seconds:.1f}s"
-    elif seconds < 3600:
-        minutes = seconds / 60
-        return f"{minutes:.1f}m"
-    else:
-        hours = seconds / 3600
-        return f"{hours:.1f}h"
-
-
-async def bulk_delete_messages(channel: discord.TextChannel, count: int, check_func=None):
-    """
-    Bulk delete messages from a channel with optional filter.
-    """
-    try:
-        def default_check(msg):
-            return not msg.pinned
-        
-        check = check_func or default_check
-        deleted = await channel.purge(limit=count, check=check)
-        return len(deleted)
-    except discord.Forbidden:
-        logger.warning(f"Bot doesn't have permission to delete messages in channel {channel.id}")
-        return 0
-    except Exception as e:
-        logger.error(f"Error bulk deleting messages in channel {channel.id}: {e}")
         return 0

@@ -213,7 +213,7 @@ class ReflectionAgent:
 
         except Exception as e:
             report.add_error(f"Reflection process failed: {str(e)}")
-            logging.error(f"Nightly reflection failed: {e}")
+            logging.exception(f"Nightly reflection failed: {e}")
 
         finally:
             report.end_time = datetime.utcnow()
@@ -259,7 +259,7 @@ class ReflectionAgent:
         except Exception as e:
             result.success = False
             result.error_message = str(e)
-            logging.error(f"User reflection failed for {user_id}: {e}")
+            logging.exception(f"User reflection failed for {user_id}: {e}")
             await self.db.log_reflection_error(user_id, str(e))
 
         finally:
@@ -458,7 +458,7 @@ class ReflectionAgent:
         result.behavioral_analysis = behavioral_analysis
 
         # Apply PAD baseline drift based on recent emotional patterns
-        drift_result = await self._apply_pad_baseline_drift(user_id, behavioral_analysis)
+        drift_result = await self._apply_pad_baseline_drift(user_id)
         result.pad_drift_applied = drift_result
 
         # Evolve quirks based on usage patterns
@@ -470,7 +470,7 @@ class ReflectionAgent:
         result.needs_update = needs_update
 
         # Calculate personality stability metrics
-        stability_metrics = await self._calculate_personality_stability(user_id, current_personality)
+        stability_metrics = await self._calculate_personality_stability(user_id)
         result.stability_metrics = stability_metrics
 
         return result
@@ -605,7 +605,7 @@ class ReflectionAgent:
                 new_strength = max(0.0, old_strength - decay_amount)
 
             # Update confidence based on consistency
-            confidence_change = self._calculate_quirk_confidence_change(quirk, recent_reinforcements)
+            confidence_change = self._calculate_quirk_confidence_change(recent_reinforcements)
             new_confidence = max(0.0, min(1.0, quirk.confidence + confidence_change))
 
             # Apply updates if significant changes
@@ -641,7 +641,7 @@ class ReflectionAgent:
 
         return result
 
-    def _calculate_quirk_confidence_change(self, quirk: Quirk, reinforcement_count: int) -> float:
+    def _calculate_quirk_confidence_change(self, reinforcement_count: int) -> float:
         """Calculate how to update quirk confidence based on recent reinforcements"""
         if reinforcement_count > 0:
             # Increase confidence with positive reinforcement
@@ -650,7 +650,7 @@ class ReflectionAgent:
             # Decrease confidence for lack of reinforcement
             return -0.01  # Small negative adjustment
 
-    async def _apply_pad_baseline_drift(self, user_id: str, behavioral_analysis: BehavioralAnalysis) -> Dict[str, float]:
+    async def _apply_pad_baseline_drift(self, user_id: str) -> Dict[str, float]:
         """
         Apply PAD baseline drift based on recent emotional patterns
         Uses the formula: new_baseline = current_baseline + (average_interaction_pad - current_baseline) * 0.01
@@ -731,7 +731,7 @@ class ReflectionAgent:
             "total_needs_updated": len(updates)
         }
 
-    async def _calculate_personality_stability(self, user_id: str, current_personality: PADState) -> Dict[str, float]:
+    async def _calculate_personality_stability(self, user_id: str) -> Dict[str, float]:
         """Calculate personality stability metrics"""
         # Get historical personality data
         historical_data = await self.db.get_pad_state_history(user_id, days=30)

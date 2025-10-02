@@ -36,9 +36,7 @@ CREATE TABLE personality_state (
 
     -- Session context
     session_id UUID,
-    trigger_event VARCHAR(100), -- What caused this state change
-
-    UNIQUE(user_id, is_current) -- Only one current state per user
+    trigger_event VARCHAR(100) -- What caused this state change
 );
 
 -- Create interactions table for comprehensive interaction logging
@@ -98,7 +96,8 @@ CREATE INDEX idx_interactions_proactive ON interactions(user_id, is_proactive, t
 
 -- JSON field indexes for PAD queries
 CREATE INDEX idx_personality_pad_baseline ON personality_state USING GIN(pad_baseline);
-CREATE INDEX idx_interactions_pad_states ON interactions USING GIN(pad_before), USING GIN(pad_after);
+CREATE INDEX idx_interactions_pad_before ON interactions USING GIN (pad_before);
+CREATE INDEX idx_interactions_pad_after ON interactions USING GIN (pad_after);
 
 -- Insert a default personality state for testing
 INSERT INTO personality_state (

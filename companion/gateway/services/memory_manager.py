@@ -161,11 +161,11 @@ class MemoryManager:
             return memory_id
             
         except Exception as e:
-            self.logger.error(f"Memory storage failed for user {user_id}: {e}")
+            self.logger.exception(f"Memory storage failed for user {user_id}: {e}")
             raise MemoryManagerError(
                 message=f"Memory storage failed: {str(e)}",
                 operation="store_memory"
-            )
+            ) from e
     
     async def _ensure_collection_exists(self, collection_name: str):
         """
@@ -665,7 +665,6 @@ class MemoryManager:
             Number of collections updated
         """
         try:
-            decay_rate = 0.05  # 5% decay per update cycle
             updated_count = 0
 
             # Get all user collections
@@ -704,8 +703,6 @@ class MemoryManager:
             Number of memories deleted
         """
         try:
-            from datetime import timedelta
-            cutoff_date = datetime.utcnow() - timedelta(days=age_threshold_days)
             deleted_count = 0
 
             # Get all user collections
@@ -913,4 +910,4 @@ class MemoryManager:
             self.logger.error(f"Failed to migrate memories from {source_user_id} to {target_user_id}: {e}")
             # Note: In a real implementation, you might want to implement rollback here
             # For now, return 0 to indicate failure
-            raise e
+            raise

@@ -69,7 +69,7 @@ class CompanionBot(commands.Bot):
             await self.redis_client.ping()
             self.logger.info(f"Redis client initialized successfully at {self.redis_url}")
         except Exception as e:
-            self.logger.error(f"Failed to initialize Redis client: {e}")
+            self.logger.exception(f"Failed to initialize Redis client: {e}")
             self.logger.warning("Rate limiting will be degraded (fail-open)")
             # Set to None so checks will gracefully degrade
             self.redis_client = None
@@ -82,7 +82,7 @@ class CompanionBot(commands.Bot):
             await self.tree.sync()
             self.logger.info("Slash commands synchronized")
         except Exception as e:
-            self.logger.error(f"Error syncing commands: {e}")
+            self.logger.exception(f"Error syncing commands: {e}")
 
         # Start proactive message processor
         self.process_proactive_messages.start()
@@ -158,8 +158,8 @@ class CompanionBot(commands.Bot):
                 # Remove the waiting reaction
                 try:
                     await message.remove_reaction("⏳", self.user)
-                except:
-                    pass
+                except discord.DiscordException:
+                    pass  # Ignore Discord API errors (message deleted, no permission, etc.)
 
             # Acquire user lock and process message
             lock_acquired = False
@@ -170,14 +170,15 @@ class CompanionBot(commands.Bot):
                         # Process the message via gateway API
                         await self._process_message_via_gateway(message)
                     except Exception as e:
+                        self.logger.exception(f"Error processing message via gateway: {e}")
                         error_msg = await handle_error(e, message)
                         await message.channel.send(error_msg)
                     finally:
                         # Remove any temporary reactions
                         try:
                             await message.clear_reactions()
-                        except:
-                            pass  # Ignore if we can't clear reactions
+                        except discord.DiscordException:
+                            pass  # Ignore Discord API errors (message deleted, no permission, etc.)
             finally:
                 # Only delete lock if it was acquired and still exists
                 if lock_acquired and user_id in self.user_locks:
@@ -228,7 +229,7 @@ class CompanionBot(commands.Bot):
             except asyncio.TimeoutError:
                 await message.reply("Sorry, the response is taking too long. Please try again.")
             except Exception as e:
-                self.logger.error(f"Error processing message via gateway: {e}")
+                self.logger.exception(f"Error processing message via gateway: {e}")
                 await message.reply("An error occurred while processing your message.")
 
     async def send_proactive_message(self, user_id: str, content: str, trigger_reason: str = "system"):
@@ -265,7 +266,7 @@ class CompanionBot(commands.Bot):
                 user_id_int = int(user_id)
                 user = self.get_user(user_id_int)
             except ValueError:
-                self.logger.error(f"Invalid user_id format: {user_id}")
+                self.logger.exception(f"Invalid user_id format: {user_id}")
                 return
 
             if not user:
@@ -305,7 +306,7 @@ class CompanionBot(commands.Bot):
                 self.logger.warning(f"Could not send proactive message to user {user_id} - DM forbidden and no fallback channel")
             
         except Exception as e:
-            self.logger.error(f"Error processing proactive message: {e}")
+            self.logger.exception(f"Error processing proactive message: {e}")
 
     def get_user_by_id(self, user_id: str) -> Optional[discord.User]:
         """
@@ -353,7 +354,7 @@ class CompanionBot(commands.Bot):
                     self.logger.error(f"Could not get user profile: {response.status}")
                     return {}
         except Exception as e:
-            self.logger.error(f"Error getting/creating user profile: {e}")
+            self.logger.exception(f"Error getting/creating user profile: {e}")
             return {}
 
     async def close(self):
@@ -375,7 +376,7 @@ class CompanionBot(commands.Bot):
                 await self.redis_client.close()
                 self.logger.info("Redis client closed")
             except Exception as e:
-                self.logger.error(f"Error closing Redis client: {e}")
+                self.logger.exception(f"Error closing Redis client: {e}")
 
         # Release all user locks
         self.user_locks.clear()
@@ -391,7 +392,7 @@ class CompanionBot(commands.Bot):
         """Called when the bot resumes connection to Discord."""
         self.logger.info("Bot resumed connection to Discord")
 
-    async def on_error(self, event_method, *args, **kwargs):
+    async def on_error(self, event_method, *_args, **_kwargs):
         """
         Handle any uncaught errors in the bot.
         """

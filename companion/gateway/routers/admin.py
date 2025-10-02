@@ -53,7 +53,7 @@ async def get_all_users(
             "timestamp": datetime.utcnow()
         }
     except Exception as e:
-        logger.error(f"Error getting all users: {e}")
+        logger.exception(f"Error getting all users: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -270,8 +270,7 @@ async def get_scheduler_status():
 @router.post("/scheduler/{job_id}/control", response_model=Dict[str, str])
 async def control_scheduler_job(
     job_id: str,
-    action: str = Query(..., regex="^(pause|resume|trigger)$"),
-    user_service: UserService = Depends(get_users)
+    action: str = Query(..., regex="^(pause|resume|trigger)$")
 ):
     """
     Control a specific scheduled job.

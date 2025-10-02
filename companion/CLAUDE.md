@@ -139,7 +139,7 @@ Key tables (see `database/migrations/` for full schemas):
 
 ## Code Organization
 
-```
+```plaintext
 gateway/
 ├── main.py              # FastAPI app + 4-phase startup
 ├── config.py            # Settings via Pydantic

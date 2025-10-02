@@ -19,13 +19,7 @@ class MaximalMarginalRelevance:
     The MMR algorithm selects items that are both relevant to the query and diverse
     among the selected set, preventing redundancy in retrieved memories.
     """
-    
-    def __init__(self):
-        """
-        Initialize the MMR ranker.
-        """
-        pass
-    
+
     def _cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
         """
         Calculate cosine similarity between two vectors.

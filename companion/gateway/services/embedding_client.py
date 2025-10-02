@@ -103,11 +103,11 @@ class EmbeddingClient:
                 )
                 
         except httpx.RequestError as e:
-            self.logger.error(f"Embedding service request error: {e}")
+            self.logger.exception(f"Embedding service request error: {e}")
             raise ServiceUnavailableError(
                 service_name="Embedding Service",
                 message=f"Request error: {str(e)}"
-            )
+            ) from e
     
     async def embed_batch(self, texts: List[str]) -> List[List[float]]:
         """
@@ -157,11 +157,11 @@ class EmbeddingClient:
                 message=f"Batch request error: {str(e)}"
             )
         except (KeyError, json.JSONDecodeError) as e:
-            self.logger.error(f"Batch embedding response parsing error: {e}. Response may be malformed.")
+            self.logger.exception(f"Batch embedding response parsing error: {e}. Response may be malformed.")
             raise ServiceUnavailableError(
                 service_name="Embedding Service",
                 message=f"Invalid response format: {str(e)}"
-            )
+            ) from e
         except ServiceUnavailableError:
             # Re-raise ServiceUnavailableError from within the try block
             raise

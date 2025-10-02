@@ -27,7 +27,7 @@ class CompanionCommands(commands.Cog):
         self.session = None
         self.user_locks = {}  # Prevent concurrent processing per user
 
-    async def cog_before_invoke(self, ctx):
+    async def cog_before_invoke(self, _ctx):
         """Ensure an aiohttp session exists before each command"""
         if self.session is None or self.session.closed:
             self.session = aiohttp.ClientSession()
@@ -419,10 +419,10 @@ class CompanionCommands(commands.Cog):
                         logger.error(f"Gateway API error: {response.status} - {await response.text()}")
                         return None
         except asyncio.TimeoutError:
-            logger.error(f"Gateway API timeout for URL: {url}")
+            logger.exception(f"Gateway API timeout for URL: {url}")
             return None
         except Exception as e:
-            logger.error(f"Gateway API error for URL {url}: {e}")
+            logger.exception(f"Gateway API error for URL {url}: {e}")
             return None
 
     @commands.command(name="ping")

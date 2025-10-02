@@ -74,7 +74,7 @@ The system consists of 7 containerized microservices:
 1. **Clone the repository:**
 ```bash
 git clone <repository-url>
-cd companion-system
+cd project-lyra
 ```
 
 2. **Configure environment variables:**

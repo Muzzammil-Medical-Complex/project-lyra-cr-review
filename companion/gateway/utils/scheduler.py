@@ -6,6 +6,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 from datetime import datetime
+from typing import Optional
 import asyncio
 import logging
 import atexit
@@ -326,7 +327,7 @@ class SchedulerService:
         
         return health
     
-    async def _send_proactive_message(self, user_id: str, message: str, trigger_reason: str):
+    async def _send_proactive_message(self, user_id: str, message: str):
         """Send a proactive message to a user through the appropriate channel."""
         try:
             # In a real implementation, this would send the message through Discord or other channels
@@ -394,7 +395,7 @@ class SchedulerService:
             job.resume()
             self.logger.info(f"Resumed job: {job_id}")
     
-    async def add_custom_job(self, func, trigger, job_id: str, name: str = None, **kwargs):
+    async def add_custom_job(self, func, trigger, job_id: str, name: Optional[str] = None, **kwargs):
         """Add a custom job to the scheduler."""
         self.scheduler.add_job(
             func=func,

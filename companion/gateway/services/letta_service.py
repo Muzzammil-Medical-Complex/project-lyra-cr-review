@@ -94,7 +94,7 @@ class LettaService:
                     return None
 
         except Exception as e:
-            logger.error(f"Exception creating Letta agent for user {user_id}: {e}")
+            logger.exception(f"Exception creating Letta agent for user {user_id}: {e}")
             return None
 
     def _create_system_prompt(self, personality_data: PersonalitySnapshot) -> str:
