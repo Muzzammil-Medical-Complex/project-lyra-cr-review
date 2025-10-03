@@ -6,6 +6,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from typing import Optional
 import asyncio
 import logging
@@ -27,7 +28,7 @@ class SchedulerService:
         Initialize the scheduler with service container
         """
         self.services = services_container
-        self.scheduler = AsyncIOScheduler()
+        self.scheduler = AsyncIOScheduler(timezone=ZoneInfo("UTC"))
         self.logger = logging.getLogger(__name__)
         
         # Job functions that will be scheduled
@@ -194,13 +195,13 @@ class SchedulerService:
                         await asyncio.sleep(0.1)
                         
                 except Exception as e:
-                    self.logger.error(f"Error checking proactive for user {user_id}: {e}")
+                    self.logger.exception(f"Error checking proactive for user {user_id}: {e}")
                     continue
             
             self.logger.info(f"Proactive checks completed. Initiated {initiated_count} conversations")
             
         except Exception as e:
-            self.logger.error(f"Error in proactive checks: {e}")
+            self.logger.exception(f"Error in proactive checks: {e}")
             try:
                 await self.services.db.log_background_job_error("proactive_checks", str(e))
             except Exception:
@@ -217,7 +218,7 @@ class SchedulerService:
             self.logger.info("Memory recency update completed")
             
         except Exception as e:
-            self.logger.error(f"Error in memory recency update: {e}")
+            self.logger.exception(f"Error in memory recency update: {e}")
             try:
                 await self.services.db.log_background_job_error("memory_recency_update", str(e))
             except Exception:
@@ -233,7 +234,7 @@ class SchedulerService:
             self.logger.info(f"Memory cleanup completed. Cleaned {cleaned_count} memories")
             
         except Exception as e:
-            self.logger.error(f"Error in memory cleanup: {e}")
+            self.logger.exception(f"Error in memory cleanup: {e}")
             try:
                 await self.services.db.log_background_job_error("memory_cleanup", str(e))
             except Exception:
@@ -264,13 +265,13 @@ class SchedulerService:
                         decayed_count += 1
                         
                 except Exception as e:
-                    self.logger.error(f"Error decaying needs for user {user_id}: {e}")
+                    self.logger.exception(f"Error decaying needs for user {user_id}: {e}")
                     continue
             
             self.logger.info(f"Needs decay completed. Updated {decayed_count} needs")
             
         except Exception as e:
-            self.logger.error(f"Error in needs decay: {e}")
+            self.logger.exception(f"Error in needs decay: {e}")
             try:
                 await self.services.db.log_background_job_error("needs_decay", str(e))
             except Exception:
@@ -295,7 +296,7 @@ class SchedulerService:
             self.logger.info("User engagement check completed")
             
         except Exception as e:
-            self.logger.error(f"Error in user engagement check: {e}")
+            self.logger.exception(f"Error in user engagement check: {e}")
             try:
                 await self.services.db.log_background_job_error("user_engagement_check", str(e))
             except Exception:
@@ -354,7 +355,7 @@ class SchedulerService:
             await self.services.db.increment_proactive_message_count(user_id)
             
         except Exception as e:
-            self.logger.error(f"Error sending proactive message to {user_id}: {e}")
+            self.logger.exception(f"Error sending proactive message to {user_id}: {e}")
             try:
                 await self.services.db.log_proactive_message_error(user_id, message, str(e))
             except Exception:

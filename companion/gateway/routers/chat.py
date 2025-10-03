@@ -212,10 +212,10 @@ async def process_message(
     except SecurityThreatDetected as e:
         raise HTTPException(status_code=400, detail=f"Security threat detected: {str(e)}")
     except ChatProcessingError as e:
-        logger.error(f"Chat processing error for {request.user_id}: {e}")
+        logger.exception(f"Chat processing error for {request.user_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Chat processing error: {str(e)}")
     except Exception as e:
-        logger.error(f"Unexpected error processing message for {request.user_id}: {e}")
+        logger.exception(f"Unexpected error processing message for {request.user_id}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
