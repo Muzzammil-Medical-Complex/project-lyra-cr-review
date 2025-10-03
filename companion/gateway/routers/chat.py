@@ -42,7 +42,6 @@ async def process_message(
     user_service: UserService = Depends(get_users),
     security_detector: SemanticInjectionDetector = Depends(get_security),
     appraisal_engine: AppraisalEngine = Depends(get_appraisal),
-    db_manager: DatabaseManager = Depends(get_db),
     proactive_manager: ProactiveManager = Depends(get_proactive)
 ):
     """
@@ -186,9 +185,6 @@ async def process_message(
         background_tasks.add_task(
             _check_proactive_opportunities,
             request.user_id,
-            personality_engine,
-            memory_manager,
-            user_service,
             proactive_manager
         )
         
@@ -208,22 +204,19 @@ async def process_message(
         )
         
     except UserNotFoundError:
-        raise HTTPException(status_code=404, detail=f"User {request.user_id} not found")
+        raise HTTPException(status_code=404, detail=f"User {request.user_id} not found") from None
     except SecurityThreatDetected as e:
-        raise HTTPException(status_code=400, detail=f"Security threat detected: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Security threat detected: {e!s}") from e
     except ChatProcessingError as e:
-        logger.exception(f"Chat processing error for {request.user_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Chat processing error: {str(e)}")
+        logger.exception(f"Chat processing error for {request.user_id}")
+        raise HTTPException(status_code=500, detail=f"Chat processing error: {e!s}") from e
     except Exception as e:
-        logger.exception(f"Unexpected error processing message for {request.user_id}: {e}")
+        logger.exception(f"Unexpected error processing message for {request.user_id}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
 async def _check_proactive_opportunities(
-    user_id: str, 
-    personality_engine, 
-    memory_manager,
-    user_service,
+    user_id: str,
     proactive_manager: ProactiveManager
 ):
     """
@@ -247,7 +240,6 @@ async def _check_proactive_opportunities(
 async def initiate_proactive_conversation(
     user_id: str,
     proactive_context: ProactiveContext,
-    background_tasks: BackgroundTasks,
     letta_service: LettaService = Depends(get_letta),
     personality_engine: PersonalityEngine = Depends(get_personality),
     memory_manager: MemoryManager = Depends(get_memory),
@@ -349,7 +341,6 @@ async def initiate_proactive_conversation(
 async def get_conversation_session(
     user_id: str,
     session_id: Optional[str] = None,
-    limit: int = 50,
     user_service: UserService = Depends(get_users)
 ):
     """

@@ -190,7 +190,32 @@ class QueryExecutor:
             query_stripped = re.sub(r'--.*?$', '', query_stripped, flags=re.MULTILINE)
             query_stripped = query_stripped.strip().upper()
 
-            if query_stripped.startswith('SELECT'):
+            # Detect statement type - handle CTEs first
+            if query_stripped.startswith('WITH'):
+                statement = sqlparse.parse(query)[0]
+                statement_type = None
+                for token in statement.flatten():
+                    if token.ttype in Keyword:
+                        keyword = token.value.upper()
+                        if keyword in {"WITH", "RECURSIVE"}:
+                            continue
+                        if keyword in {"SELECT", "INSERT", "UPDATE", "DELETE"}:
+                            statement_type = keyword
+                            break
+
+                if statement_type == "SELECT":
+                    return await connection.fetch(query, *(params or ()))
+                elif statement_type == "INSERT":
+                    if 'RETURNING' in query_stripped:
+                        return await connection.fetchrow(query, *(params or ()))
+                    return await connection.execute(query, *(params or ()))
+                elif statement_type in {"UPDATE", "DELETE"}:
+                    if 'RETURNING' in query_stripped:
+                        return await connection.fetch(query, *(params or ()))
+                    return await connection.execute(query, *(params or ()))
+
+                return await connection.execute(query, *(params or ()))
+            elif query_stripped.startswith('SELECT'):
                 return await connection.fetch(query, *(params or ()))
             elif query_stripped.startswith('INSERT') and 'RETURNING' in query_stripped:
                 return await connection.fetchrow(query, *(params or ()))
