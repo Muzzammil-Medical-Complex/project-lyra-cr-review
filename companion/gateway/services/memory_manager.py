@@ -879,14 +879,14 @@ class MemoryManager:
                     None,
                     lambda: self.qdrant.count(collection_name=source_episodic)
                 )
-                total_source_points += source_episodic_count
+                total_source_points += source_episodic_count.count
             
             if await self._collection_exists(source_semantic):
                 source_semantic_count = await asyncio.get_event_loop().run_in_executor(
                     None,
                     lambda: self.qdrant.count(collection_name=source_semantic)
                 )
-                total_source_points += source_semantic_count
+                total_source_points += source_semantic_count.count
 
             # Count total points in target collections
             total_target_points = 0
@@ -895,14 +895,14 @@ class MemoryManager:
                     None,
                     lambda: self.qdrant.count(collection_name=target_episodic)
                 )
-                total_target_points += target_episodic_count
+                total_target_points += target_episodic_count.count
             
             if await self._collection_exists(target_semantic):
                 target_semantic_count = await asyncio.get_event_loop().run_in_executor(
                     None,
                     lambda: self.qdrant.count(collection_name=target_semantic)
                 )
-                total_target_points += target_semantic_count
+                total_target_points += target_semantic_count.count
 
             self.logger.info(f"Migrated {migrated_count} memories from {source_user_id} to {target_user_id}")
             self.logger.info(f"Source collection count: {total_source_points}, Target collection count: {total_target_points}")

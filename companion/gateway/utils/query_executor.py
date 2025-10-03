@@ -354,13 +354,30 @@ class QueryExecutor:
             # Detect statement type
             if query_stripped.startswith('WITH'):
                 # CTE query - determine the final statement type
-                # Look for SELECT/INSERT/UPDATE/DELETE after the CTE
-                if 'SELECT' in query_stripped:
+                # Parse the actual final statement after CTE
+                statement = sqlparse.parse(scoped_query)[0]
+                statement_type = None
+                for token in statement.flatten():
+                    if token.ttype in Keyword:
+                        keyword = token.value.upper()
+                        if keyword in {"WITH", "RECURSIVE"}:
+                            continue
+                        if keyword in {"SELECT", "INSERT", "UPDATE", "DELETE"}:
+                            statement_type = keyword
+                            break
+
+                if statement_type == "SELECT":
                     return await connection.fetch(scoped_query, *scoped_params)
-                elif 'INSERT' in query_stripped and 'RETURNING' in query_stripped:
-                    return await connection.fetchrow(scoped_query, *scoped_params)
-                else:
+                elif statement_type == "INSERT":
+                    if 'RETURNING' in query_stripped:
+                        return await connection.fetchrow(scoped_query, *scoped_params)
                     return await connection.execute(scoped_query, *scoped_params)
+                elif statement_type in {"UPDATE", "DELETE"}:
+                    if 'RETURNING' in query_stripped:
+                        return await connection.fetch(scoped_query, *scoped_params)
+                    return await connection.execute(scoped_query, *scoped_params)
+
+                return await connection.execute(scoped_query, *scoped_params)
             elif query_stripped.startswith('SELECT'):
                 return await connection.fetch(scoped_query, *scoped_params)
             elif query_stripped.startswith('INSERT'):

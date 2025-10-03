@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from typing import Dict, Any, Optional
 import asyncio
 import logging
+import uuid
 from datetime import datetime
 
 from ..models.interaction import ChatRequest, ChatResponse, InteractionRecord, ProactiveContext
@@ -94,9 +95,10 @@ async def process_message(
         personality_snapshot = await personality_engine.get_personality_snapshot(request.user_id)
         
         # Store the interaction with initial PAD state
+        session_id = request.session_id or str(uuid.uuid4())
         interaction_record = InteractionRecord(
             user_id=request.user_id,
-            session_id=request.session_id,
+            session_id=session_id,
             user_message=request.message,
             timestamp=start_time,
             pad_before={

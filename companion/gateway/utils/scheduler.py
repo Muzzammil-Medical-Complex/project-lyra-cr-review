@@ -133,7 +133,7 @@ class SchedulerService:
             report = await reflection_agent.run_nightly_reflection()
             self.logger.info(f"Nightly reflection completed. Processed {len(report.batch_results or [])} batches")
             
-        except Exception:
+        except Exception as e:
             self.logger.exception("Error in nightly reflection")
             # Log error to database as well
             try:
