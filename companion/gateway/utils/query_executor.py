@@ -221,7 +221,7 @@ class QueryExecutor:
                 return await connection.fetchrow(query, *(params or ()))
             else:
                 return await connection.execute(query, *(params or ()))
-        except Exception as e:
+        except Exception:
             logger.exception("Error executing admin query")
             raise
 
@@ -310,6 +310,6 @@ class QueryExecutor:
             else:
                 # For other queries (CREATE, DROP, ALTER, etc.), execute directly
                 return await connection.execute(scoped_query, *scoped_params)
-        except Exception as e:
+        except Exception:
             logger.exception(f"Error executing user-scoped query for user {user_id}")
             raise

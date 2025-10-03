@@ -210,9 +210,9 @@ async def process_message(
     except ChatProcessingError as e:
         logger.exception(f"Chat processing error for {request.user_id}")
         raise HTTPException(status_code=500, detail=f"Chat processing error: {e!s}") from e
-    except Exception as e:
+    except Exception:
         logger.exception(f"Unexpected error processing message for {request.user_id}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise HTTPException(status_code=500, detail="Internal server error") from None
 
 
 async def _check_proactive_opportunities(
@@ -233,7 +233,7 @@ async def _check_proactive_opportunities(
             # via the Discord bot or other channels
             
     except Exception as e:
-        logger.error(f"Error in proactive check for {user_id}: {e}")
+        logger.exception(f"Error in proactive check for {user_id}")
 
 
 @router.post("/proactive/{user_id}", response_model=ChatResponse)
@@ -333,8 +333,8 @@ async def initiate_proactive_conversation(
     except UserNotFoundError:
         raise HTTPException(status_code=404, detail=f"User {user_id} not found")
     except Exception as e:
-        logger.error(f"Error initiating proactive conversation for {user_id}: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        logger.exception(f"Error initiating proactive conversation for {user_id}")
+        raise HTTPException(status_code=500, detail="Internal server error") from e
 
 
 @router.get("/session/{user_id}", response_model=Dict[str, Any])
@@ -374,8 +374,8 @@ async def get_conversation_session(
     except UserNotFoundError:
         raise HTTPException(status_code=404, detail=f"User {user_id} not found")
     except Exception as e:
-        logger.error(f"Error getting session for {user_id}: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        logger.exception(f"Error getting session for {user_id}")
+        raise HTTPException(status_code=500, detail="Internal server error") from e
 
 
 @router.post("/session/{user_id}/end", response_model=Dict[str, bool])
@@ -407,8 +407,8 @@ async def end_conversation_session(
     except UserNotFoundError:
         raise HTTPException(status_code=404, detail=f"User {user_id} not found")
     except Exception as e:
-        logger.error(f"Error ending session {session_id} for {user_id}: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        logger.exception(f"Error ending session {session_id} for {user_id}")
+        raise HTTPException(status_code=500, detail="Internal server error") from e
 
 
 @router.get("/capabilities/{user_id}", response_model=Dict[str, Any])
@@ -451,5 +451,5 @@ async def get_user_capabilities(
     except UserNotFoundError:
         raise HTTPException(status_code=404, detail=f"User {user_id} not found")
     except Exception as e:
-        logger.error(f"Error getting capabilities for {user_id}: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        logger.exception(f"Error getting capabilities for {user_id}")
+        raise HTTPException(status_code=500, detail="Internal server error") from e

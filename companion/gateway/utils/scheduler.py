@@ -194,7 +194,7 @@ class SchedulerService:
                         # Small delay to avoid overwhelming the system
                         await asyncio.sleep(0.1)
                         
-                except Exception as e:
+                except Exception:
                     self.logger.exception(f"Error checking proactive for user {user_id}")
                     continue
             
@@ -264,7 +264,7 @@ class SchedulerService:
                         )
                         decayed_count += 1
                         
-                except Exception as e:
+                except Exception:
                     self.logger.exception(f"Error decaying needs for user {user_id}")
                     continue
             
