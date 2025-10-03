@@ -80,8 +80,8 @@ class DefensiveResponseGenerator:
         # Extract personality components
         big_five = user_personality.get("big_five", {})
         current_pad = user_personality.get("current_pad", {})
-        current_emotion = user_personality.get("current_emotion", "neutral")
-        active_quirks = user_personality.get("active_quirks", [])
+        # current_emotion unused; removed
+        # active_quirks unused; removed
         
         # Define response templates based on threat type
         threat_templates = {

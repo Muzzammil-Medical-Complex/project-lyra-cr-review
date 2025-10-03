@@ -79,17 +79,17 @@ class GroqClient:
                 )
                 
         except httpx.RequestError as e:
-            self.logger.error(f"Groq API request error: {e}")
+            self.logger.exception("Groq API request error")
             raise ServiceUnavailableError(
                 service_name="Groq",
-                message=f"Request error: {str(e)}"
-            )
+                message=f"Request error: {e}"
+            ) from e
         except Exception as e:
-            self.logger.error(f"Unexpected error in Groq API call: {e}")
+            self.logger.exception("Unexpected error in Groq API call")
             raise ServiceUnavailableError(
                 service_name="Groq",
-                message=f"Unexpected error: {str(e)}"
-            )
+                message=f"Unexpected error: {e}"
+            ) from e
     
     async def _request_with_backoff(
         self,
@@ -225,6 +225,223 @@ class GroqClient:
                     raise ServiceUnavailableError("GroqClient", "Failed to get valid JSON response after multiple attempts.")
                 await asyncio.sleep(1) # Wait before retrying
         return {} # Should not be reached
+
+    async def analyze_behavioral_changes(self, interactions: List[Dict[str, Any]], analysis_focus: List[str]) -> Dict[str, Any]:
+        """
+        Analyze behavioral changes in user interactions.
+
+        Args:
+            interactions: List of interaction data
+            analysis_focus: List of analysis focus areas
+
+        Returns:
+            Dictionary containing detected changes and confidence
+        """
+        prompt = f"""
+        Analyze the following user interactions for behavioral changes and patterns.
+
+        Interactions:
+        {json.dumps(interactions, indent=2)}
+
+        Analysis Focus:
+        {', '.join(analysis_focus)}
+
+        Return a JSON object with the following structure:
+        {{
+            "detected_changes": [
+                {{
+                    "type": "change_type",
+                    "description": "description of change",
+                    "confidence": 0.0-1.0,
+                    "evidence": ["supporting evidence"]
+                }}
+            ],
+            "confidence": 0.0-1.0,
+            "communication_evolution": {{
+                "style_changes": "description",
+                "frequency_changes": "description",
+                "emotional_tone_changes": "description"
+            }}
+        }}
+        """
+
+        try:
+            response = await self.chat_completion(
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=1024,
+                temperature=0.3
+            )
+
+            response_text = response.get("choices", [{}])[0].get("message", {}).get("content", "")
+
+            # Try to extract JSON from response
+            import re
+            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group())
+            else:
+                # Fallback response
+                return {
+                    "detected_changes": [],
+                    "confidence": 0.5,
+                    "communication_evolution": {
+                        "style_changes": "No significant changes detected",
+                        "frequency_changes": "No significant changes detected",
+                        "emotional_tone_changes": "No significant changes detected"
+                    }
+                }
+
+        except Exception as e:
+            self.logger.exception("Failed to analyze behavioral changes")
+            # Return safe fallback
+            return {
+                "detected_changes": [],
+                "confidence": 0.5,
+                "communication_evolution": {
+                    "style_changes": "Analysis failed",
+                    "frequency_changes": "Analysis failed",
+                    "emotional_tone_changes": "Analysis failed"
+                }
+            }
+
+    async def detect_conversation_patterns(self, interactions: List[Dict[str, Any]], pattern_types: List[str]) -> Dict[str, Any]:
+        """
+        Detect recurring patterns in conversation data.
+
+        Args:
+            interactions: List of interaction data
+            pattern_types: Types of patterns to detect
+
+        Returns:
+            Dictionary containing detected patterns
+        """
+        prompt = f"""
+        Analyze the following conversation interactions for recurring patterns.
+
+        Interactions:
+        {json.dumps(interactions, indent=2)}
+
+        Pattern Types to Detect:
+        {', '.join(pattern_types)}
+
+        Return a JSON object with the following structure:
+        {{
+            "patterns": [
+                {{
+                    "pattern_type": "pattern_type",
+                    "description": "description of pattern",
+                    "confidence": 0.0-1.0,
+                    "frequency": "how often this pattern occurs",
+                    "strength": 0.0-1.0,
+                    "metadata": {{
+                        "time_preference": "preferred time if temporal",
+                        "duration_preference": "preferred length if duration",
+                        "additional_details": "other relevant details"
+                    }}
+                }}
+            ]
+        }}
+        """
+
+        try:
+            response = await self.chat_completion(
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=1024,
+                temperature=0.3
+            )
+
+            response_text = response.get("choices", [{}])[0].get("message", {}).get("content", "")
+
+            # Try to extract JSON from response
+            import re
+            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group())
+            else:
+                # Fallback response
+                return {"patterns": []}
+
+        except Exception as e:
+            self.logger.exception("Failed to detect conversation patterns")
+            # Return safe fallback
+            return {"patterns": []}
+
+    async def analyze_emotional_patterns(self, emotion_data: List[Dict[str, Any]], trend_analysis: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Analyze emotional patterns and trends.
+
+        Args:
+            emotion_data: List of emotional state data
+            trend_analysis: Pre-calculated trend metrics
+
+        Returns:
+            Dictionary containing emotional insights
+        """
+        prompt = f"""
+        Analyze the following emotional data for patterns and insights.
+
+        Emotion Data:
+        {json.dumps(emotion_data, indent=2)}
+
+        Trend Analysis:
+        {json.dumps(trend_analysis, indent=2)}
+
+        Return a JSON object with the following structure:
+        {{
+            "insights": [
+                "insight about emotional patterns",
+                "another insight"
+            ],
+            "stability_score": 0.0-1.0,
+            "confidence": 0.0-1.0,
+            "key_findings": {{
+                "overall_emotional_state": "description",
+                "notable_patterns": ["pattern1", "pattern2"],
+                "recommendations": ["recommendation1", "recommendation2"]
+            }}
+        }}
+        """
+
+        try:
+            response = await self.chat_completion(
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=1024,
+                temperature=0.3
+            )
+
+            response_text = response.get("choices", [{}])[0].get("message", {}).get("content", "")
+
+            # Try to extract JSON from response
+            import re
+            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group())
+            else:
+                # Fallback response
+                return {
+                    "insights": ["Unable to analyze emotional patterns"],
+                    "stability_score": 0.5,
+                    "confidence": 0.5,
+                    "key_findings": {
+                        "overall_emotional_state": "Analysis failed",
+                        "notable_patterns": [],
+                        "recommendations": []
+                    }
+                }
+
+        except Exception as e:
+            self.logger.exception("Failed to analyze emotional patterns")
+            # Return safe fallback
+            return {
+                "insights": ["Emotional pattern analysis failed"],
+                "stability_score": 0.5,
+                "confidence": 0.5,
+                "key_findings": {
+                    "overall_emotional_state": "Analysis failed",
+                    "notable_patterns": [],
+                    "recommendations": []
+                }
+            }
 
     async def close(self):
         """

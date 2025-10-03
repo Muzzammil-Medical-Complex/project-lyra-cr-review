@@ -184,7 +184,7 @@ class CompanionCommands(commands.Cog):
                 await ctx.respond("Could not retrieve personality data. Please try again later.", ephemeral=True)
                 
         except Exception as e:
-            error_msg = await handle_error(e, ctx)
+            error_msg = handle_error(e, ctx)
             await ctx.respond(error_msg, ephemeral=True)
 
     @discord.slash_command(
@@ -256,7 +256,7 @@ class CompanionCommands(commands.Cog):
                 await ctx.respond("No memories found for your query.", ephemeral=True)
                 
         except Exception as e:
-            error_msg = await handle_error(e, ctx)
+            error_msg = handle_error(e, ctx)
             await ctx.respond(error_msg, ephemeral=True)
 
     @discord.slash_command(
@@ -323,7 +323,7 @@ class CompanionCommands(commands.Cog):
                 await ctx.respond("Could not retrieve needs data. Please try again later.", ephemeral=True)
                 
         except Exception as e:
-            error_msg = await handle_error(e, ctx)
+            error_msg = handle_error(e, ctx)
             await ctx.respond(error_msg, ephemeral=True)
 
     @discord.slash_command(
@@ -394,7 +394,7 @@ class CompanionCommands(commands.Cog):
                 await ctx.respond("Could not retrieve your statistics. Please try again later.", ephemeral=True)
                 
         except Exception as e:
-            error_msg = await handle_error(e, ctx)
+            error_msg = handle_error(e, ctx)
             await ctx.respond(error_msg, ephemeral=True)
 
     async def _call_gateway_api(self, url: str, data: Optional[dict] = None, method: str = "GET"):

@@ -14,7 +14,7 @@ All API endpoints are prefixed with `/api` and are accessible through the gatewa
 
 ## Base URL
 
-```
+```text
 http://localhost:8000/api
 ```
 
@@ -448,7 +448,7 @@ Some endpoints support WebSocket connections for real-time updates:
 
 All responses include rate limiting information in headers:
 
-```
+```http
 X-RateLimit-Limit: 100
 X-RateLimit-Remaining: 95
 X-RateLimit-Reset: 1704110700

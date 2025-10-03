@@ -103,7 +103,7 @@ class EmbeddingClient:
                 )
                 
         except httpx.RequestError as e:
-            self.logger.exception(f"Embedding service request error: {e}")
+            self.logger.exception("Embedding service request error")
             raise ServiceUnavailableError(
                 service_name="Embedding Service",
                 message=f"Request error: {str(e)}"

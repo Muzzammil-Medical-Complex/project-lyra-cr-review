@@ -6,10 +6,10 @@ during retrieval. The algorithm balances relevance to the query with diversity a
 selected items to avoid redundancy.
 """
 
-from typing import List, Tuple
+from typing import List
 import numpy as np
 from numpy.linalg import norm
-from ..models.memory import EpisodicMemory, SemanticMemory
+from ..models.memory import EpisodicMemory
 
 
 class MaximalMarginalRelevance:
@@ -150,13 +150,13 @@ class MaximalMarginalRelevance:
         memories: List[EpisodicMemory]
     ) -> float:
         """
-        Calculate how diverse a set of memories is.
-        
+        Calculate how diverse a set of memories is (diversity score).
+
         Args:
             memories: List of memories to evaluate
-            
+
         Returns:
-            Average pairwise cosine similarity (lower = more diverse)
+            Diversity score in [0,1]: 1 - average pairwise cosine similarity
         """
         if len(memories) < 2:
             return 0.0

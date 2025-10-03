@@ -112,11 +112,11 @@ class PersonalityEngine:
             return await self.get_personality_snapshot(user_id)
             
         except Exception as e:
-            self.logger.error(f"Personality initialization failed for user {user_id}: {e}")
+            self.logger.exception("Personality initialization failed for user %s", user_id)
             raise PersonalityEngineError(
-                message=f"Personality initialization failed: {str(e)}",
+                message=f"Personality initialization failed: {e!s}",
                 operation="initialize_personality"
-            )
+            ) from e
     
     async def _initialize_default_quirks(self, user_id: str):
         """
@@ -201,7 +201,7 @@ class PersonalityEngine:
                 quirk.strength,
                 quirk.confidence
             )
-            await tx.execute(query, params)
+            await tx.execute(query, *params)
     
     async def _initialize_default_needs(self, user_id: str):
         """
@@ -312,7 +312,7 @@ class PersonalityEngine:
                 need.baseline_level,
                 need.decay_rate
             )
-            await tx.execute(query, params)
+            await tx.execute(query, *params)
     
     async def get_current_pad_state(self, user_id: str) -> Optional[PADState]:
         """

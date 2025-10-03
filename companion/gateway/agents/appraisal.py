@@ -311,7 +311,7 @@ class AppraisalEngine:
             return self.calculate_emotion_delta(event, {})
         except Exception as e:
             # Log the full traceback for debugging
-            self.logger.exception(f"AI-enhanced appraisal failed: {e}. Falling back to basic appraisal.")
+            self.logger.exception("AI-enhanced appraisal failed. Falling back to basic appraisal.")
             
             # Return a properly shaped fallback components dict with neutral/default values
             # The expected components structure includes: praiseworthiness, like_dislike, personal_relevance

@@ -8,7 +8,6 @@ preferences, and account-related information.
 from datetime import datetime, timezone
 from typing import Optional
 from pydantic import BaseModel, Field
-import uuid
 
 
 class UserProfile(BaseModel):

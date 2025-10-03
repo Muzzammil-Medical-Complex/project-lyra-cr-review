@@ -9,7 +9,7 @@ import sys
 import time
 import threading
 from typing import List, Dict, Callable, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 
 from .scheduler import SchedulerService, get_scheduler
@@ -233,8 +233,6 @@ class BackgroundTaskManager:
     async def graceful_shutdown(self, timeout: float = 30.0):
         """Perform graceful shutdown of all background tasks."""
         self.logger.info("Starting graceful shutdown...")
-        
-        start_time = time.time()
         
         # Request shutdown to all background processes
         self.request_shutdown()

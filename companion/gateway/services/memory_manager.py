@@ -913,3 +913,34 @@ class MemoryManager:
             # Note: In a real implementation, you might want to implement rollback here
             # For now, return 0 to indicate failure
             raise
+
+    async def health_check(self) -> bool:
+        """
+        Perform a health check on the memory manager components.
+
+        Returns:
+            True if all components are healthy, False otherwise
+        """
+        try:
+            # Check Qdrant connection
+            try:
+                await asyncio.get_event_loop().run_in_executor(
+                    None,
+                    lambda: self.qdrant.get_collections()
+                )
+            except Exception as e:
+                self.logger.exception("Qdrant health check failed")
+                return False
+
+            # Check embedding client availability
+            try:
+                # Simple test embedding to verify client is working
+                await self.embedding_client.embed_text("health check test")
+            except Exception as e:
+                self.logger.exception("Embedding client health check failed")
+                return False
+
+            return True
+        except Exception as e:
+            self.logger.exception("Memory manager health check failed")
+            return False

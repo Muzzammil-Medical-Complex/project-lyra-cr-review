@@ -44,7 +44,7 @@ class DatabaseManager:
             self._initialized = True
             logger.info("Database connection pool initialized successfully")
         except Exception as e:
-            logger.error(f"Failed to initialize database connection pool: {e}")
+            logger.exception("Failed to initialize database connection pool")
             raise
     
     async def close(self):
@@ -251,30 +251,12 @@ class DatabaseManager:
         result = await self.execute_user_query(user_id, query, ())
         return result[0] if result else None
 
-    async def get_recent_interaction_stats(self, user_id: str, days: int = 7):
-        """Get recent interaction statistics for a user."""
-        # Validate days parameter
-        days = int(days)
-
-        query = """
-        SELECT 
-            COUNT(*) as total_interactions,
-            AVG(conversation_length) as avg_conversation_length,
-            COUNT(*) FILTER (WHERE is_proactive = true) * 1.0 / COUNT(*) as proactive_response_rate,
-            EXTRACT(EPOCH FROM (MAX(timestamp) - MIN(timestamp))) / 3600 as hours_span,
-            COUNT(*) FILTER (WHERE user_initiated = false) * 1.0 / COUNT(*) as user_initiation_ratio,
-            EXTRACT(EPOCH FROM (NOW() - MAX(timestamp))) / 3600 as hours_since_last_interaction
-        FROM interactions 
-        WHERE user_id = $1 AND timestamp > NOW() - INTERVAL '1 day' * $2
-        """
-        result = await self.execute_user_query(user_id, query, (days,))
-        return result[0] if result else None
-
+    
     async def get_proactive_count_today(self, user_id: str) -> int:
         """Get the number of proactive conversations for a user today."""
         query = """
         SELECT COUNT(*) as count FROM interactions
-        WHERE is_proactive = true
+        WHERE user_id = $1 AND is_proactive = true
         AND DATE(timestamp) = CURRENT_DATE
         """
         result = await self.execute_user_query(user_id, query, ())
@@ -282,7 +264,7 @@ class DatabaseManager:
 
     async def get_last_user_activity(self, user_id: str):
         """Get the last activity timestamp for a user."""
-        query = "SELECT MAX(timestamp) as last_activity FROM interactions"
+        query = "SELECT MAX(timestamp) as last_activity FROM interactions WHERE user_id = $1"
         result = await self.execute_user_query(user_id, query, ())
         return result[0]['last_activity'] if result and result[0]['last_activity'] else None
 
@@ -293,7 +275,7 @@ class DatabaseManager:
             EXTRACT(HOUR FROM timestamp) as hour,
             COUNT(*) as count
         FROM interactions
-        WHERE timestamp > NOW() - INTERVAL '30 days'
+        WHERE user_id = $1 AND timestamp > NOW() - INTERVAL '30 days'
         GROUP BY EXTRACT(HOUR FROM timestamp)
         ORDER BY hour
         """
@@ -311,12 +293,12 @@ class DatabaseManager:
 
     async def get_active_users_for_reflection(self, days: int = 7) -> List[str]:
         """Get user IDs of users active in the last N days."""
-        query = f"""
+        query = """
         SELECT DISTINCT user_id FROM interactions
-        WHERE timestamp > NOW() - INTERVAL '{days} days'
+        WHERE timestamp > NOW() - make_interval(days => $1)
         ORDER BY timestamp DESC
         """
-        result = await self.pool.fetch(query)
+        result = await self.pool.fetch(query, days)
         return [row['user_id'] for row in result]
 
     async def store_reflection_report(self, report: Dict[str, Any]) -> bool:

@@ -5,7 +5,7 @@ Manages recurring tasks like nightly reflection, proactive checks, and needs dec
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 import asyncio
 import logging
@@ -166,7 +166,8 @@ class SchedulerService:
                 try:
                     # Check if user was recently sent a proactive message
                     last_proactive = await self.services.db.get_last_proactive_message_time(user_id)
-                    if last_proactive and (datetime.utcnow() - last_proactive).total_seconds() < cooldown_hours * 3600:
+                    now = datetime.now(timezone.utc)
+                    if last_proactive and (now - last_proactive).total_seconds() < cooldown_hours * 3600:
                         continue
                     
                     if await proactive_manager.should_initiate_conversation(user_id):

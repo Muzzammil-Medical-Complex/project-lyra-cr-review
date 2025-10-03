@@ -7,7 +7,7 @@ all environment variables and configuration settings for the system.
 
 from pydantic_settings import BaseSettings
 from typing import Optional
-from pydantic import Field
+from pydantic import Field, SecretStr
 
 
 class Settings(BaseSettings):
@@ -29,21 +29,25 @@ class Settings(BaseSettings):
     )
 
     # AI Service APIs
-    chutes_api_key: str = Field(
+    chutes_api_key: SecretStr = Field(
         ...,
         description="Chutes.ai API key for primary LLM"
     )
-    groq_api_key: str = Field(
+    groq_api_key: SecretStr = Field(
         ...,
         description="Groq API key for fast LLM scoring/security"
     )
-    gemini_api_key: str = Field(
+    gemini_api_key: SecretStr = Field(
         ...,
         description="Google Gemini API key for embeddings"
     )
+    embedding_service_api_key: SecretStr = Field(
+        ...,
+        description="API key for embedding service HTTP API"
+    )
 
     # Discord Integration
-    discord_bot_token: str = Field(
+    discord_bot_token: SecretStr = Field(
         ...,
         description="Discord bot token for the companion bot"
     )

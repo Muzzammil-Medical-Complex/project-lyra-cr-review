@@ -70,8 +70,8 @@ async def verify_admin(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error verifying admin access for {x_user_id}: {e}")
+        logger.exception("Error verifying admin access for user %s", x_user_id)
         raise HTTPException(
             status_code=500,
             detail="Internal server error during admin verification"
-        )
+        ) from e

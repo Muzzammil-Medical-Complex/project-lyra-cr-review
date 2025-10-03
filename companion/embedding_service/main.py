@@ -27,10 +27,15 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Get API key from environment
+# Get API keys from environment
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY environment variable is required")
+
+# Separate service API key for clients of this service
+SERVICE_API_KEY = os.getenv("EMBEDDING_SERVICE_API_KEY")
+if not SERVICE_API_KEY:
+    raise ValueError("EMBEDDING_SERVICE_API_KEY environment variable is required")
 
 # Configure Gemini
 genai.configure(api_key=GEMINI_API_KEY)
@@ -60,7 +65,7 @@ async def verify_api_key(authorization: Optional[str] = Header(None)):
 
     provided_key = authorization[7:]  # Remove "Bearer " prefix
 
-    if provided_key != GEMINI_API_KEY:
+    if provided_key != SERVICE_API_KEY:
         raise HTTPException(
             status_code=403,
             detail="Invalid API key"
@@ -304,7 +309,7 @@ async def embed_batch(request: EmbedBatchRequest, _: str = Depends(verify_api_ke
 
 
 @app.get("/cache/stats")
-async def get_cache_stats():
+async def get_cache_stats(_: str = Depends(verify_api_key)):
     """Get cache statistics."""
     try:
         # Get Redis info
@@ -326,7 +331,7 @@ async def get_cache_stats():
 
 
 @app.post("/cache/clear")
-async def clear_cache():
+async def clear_cache(_: str = Depends(verify_api_key)):
     """Clear all embedding cache."""
     try:
         # Only clear embedding cache keys (keys that start with "embed:")

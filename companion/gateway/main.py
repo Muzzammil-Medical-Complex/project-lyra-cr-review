@@ -199,7 +199,7 @@ async def lifespan(app: FastAPI):
     # Initialize EmbeddingClient
     services.embedding_client = EmbeddingClient(
         service_url=settings.embedding_service_url,
-        api_key=settings.gemini_api_key,
+        api_key=settings.embedding_service_api_key.get_secret_value(),
         dimensions=settings.embedding_dimensions
     )
 

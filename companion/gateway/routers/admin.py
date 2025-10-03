@@ -250,10 +250,10 @@ async def get_scheduler_status():
     Get the status of all scheduled background jobs.
     """
     try:
-        scheduler = await get_scheduler()
+        scheduler = get_scheduler()
         if not scheduler:
             raise HTTPException(status_code=500, detail="Scheduler not initialized")
-        
+
         jobs_status = scheduler.get_all_jobs_status()
         
         return {

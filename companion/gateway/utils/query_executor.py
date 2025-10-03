@@ -299,7 +299,7 @@ class QueryExecutor:
             else:
                 return await connection.execute(query, *(params or ()))
         except Exception as e:
-            logger.error(f"Error executing admin query: {e}")
+            logger.exception("Error executing admin query")
             raise
 
     @staticmethod
@@ -319,13 +319,22 @@ class QueryExecutor:
         Raises:
             SecurityError: If query is complex or doesn't contain user_id after injection
         """
-        # Validate that user_id is present in the query (fail-fast security check)
-        if not QueryExecutor.validate_user_id_present(query):
-            logger.error(f"Query missing user_id: {query[:200]}")
-            raise SecurityError(
-                "Query does not contain user_id in WHERE clause. This violates multi-user isolation. "
-                "Please include user_id explicitly in your query WHERE clause."
-            )
+        # Validate user scoping by statement type
+        query_head = re.sub(r'/\*.*?\*/', '', query, flags=re.DOTALL)
+        query_head = re.sub(r'--.*?$', '', query_head, flags=re.MULTILINE).strip().upper()
+        first_kw_match = re.match(r'^[A-Z]+', query_head)
+        first_kw = first_kw_match.group(0) if first_kw_match else ""
+        if first_kw in ("SELECT", "UPDATE", "DELETE"):
+            if not QueryExecutor.validate_user_id_present(query):
+                logger.exception(f"Query missing user_id in WHERE: {query[:200]}")
+                raise SecurityError(
+                    "Query must include user_id in WHERE clause to enforce multi-user isolation."
+                )
+        elif first_kw == "INSERT":
+            # Basic guard: ensure 'user_id' appears in the text (columns/values)
+            if "USER_ID" not in query_head:
+                logger.exception(f"INSERT without user_id column detected: {query[:200]}")
+                raise SecurityError("INSERT must include user_id column/value for multi-user isolation.")
         
         # Use the query and params as-is (no injection needed with explicit validation)
         scoped_query = query
@@ -362,5 +371,5 @@ class QueryExecutor:
                 # For other queries (CREATE, DROP, ALTER, etc.), execute directly
                 return await connection.execute(scoped_query, *scoped_params)
         except Exception as e:
-            logger.error(f"Error executing user-scoped query for user {user_id}: {e}")
+            logger.exception(f"Error executing user-scoped query for user {user_id}")
             raise

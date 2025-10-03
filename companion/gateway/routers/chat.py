@@ -99,7 +99,11 @@ async def process_message(
             session_id=request.session_id,
             user_message=request.message,
             timestamp=start_time,
-            pad_before=personality_snapshot.current_pad,
+            pad_before={
+                "pleasure": personality_snapshot.current_pad.pleasure,
+                "arousal": personality_snapshot.current_pad.arousal,
+                "dominance": personality_snapshot.current_pad.dominance,
+            },
             user_initiated=True
         )
         
@@ -140,7 +144,11 @@ async def process_message(
         
         # Update the interaction record with response and final PAD state
         interaction_record.agent_response = agent_response
-        interaction_record.pad_after = updated_personality
+        interaction_record.pad_after = {
+            "pleasure": updated_personality.pleasure,
+            "arousal": updated_personality.arousal,
+            "dominance": updated_personality.dominance,
+        }
         interaction_record.emotion_before = personality_snapshot.current_pad.to_emotion_octant()
         interaction_record.emotion_after = updated_personality.to_emotion_octant()
         interaction_record.response_time_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
@@ -182,7 +190,11 @@ async def process_message(
             message_id=request.message_id,
             agent_response=agent_response,
             processing_time_ms=interaction_record.response_time_ms,
-            emotional_impact=new_pad_state,
+            emotional_impact={
+                "pleasure": new_pad_state.pleasure,
+                "arousal": new_pad_state.arousal,
+                "dominance": new_pad_state.dominance,
+            },
             memories_retrieved=len(relevant_memories)
         )
         
@@ -287,8 +299,16 @@ async def initiate_proactive_conversation(
             user_message=conversation_starter,
             agent_response=agent_response,
             timestamp=start_time,
-            pad_before=personality_snapshot.current_pad,
-            pad_after=personality_snapshot.current_pad,  # No emotional change for proactive start
+            pad_before={
+                "pleasure": personality_snapshot.current_pad.pleasure,
+                "arousal": personality_snapshot.current_pad.arousal,
+                "dominance": personality_snapshot.current_pad.dominance,
+            },
+            pad_after={
+                "pleasure": personality_snapshot.current_pad.pleasure,
+                "arousal": personality_snapshot.current_pad.arousal,
+                "dominance": personality_snapshot.current_pad.dominance,
+            },  # No emotional change for proactive start
             is_proactive=True,
             proactive_trigger=proactive_context.trigger_reason,
             proactive_score=proactive_context.urgency_score or 0.0,
