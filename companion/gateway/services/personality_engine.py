@@ -580,7 +580,7 @@ class PersonalityEngine:
                 raise UserNotFoundError(user_id=user_id, message="Personality state not found")
 
             # Access baseline from the top-level field, not from current_pad
-            current_baseline = current_personality.current_pad.pad_baseline
+            current_baseline = current_personality.pad_baseline
             if not current_baseline:
                 self.logger.warning(f"No baseline PAD state found for user {user_id}, skipping drift")
                 return current_personality.current_pad
@@ -735,11 +735,11 @@ class PersonalityEngine:
                 SELECT id, user_id, openness, conscientiousness, extraversion, agreeableness, neuroticism,
                        pleasure, arousal, dominance, emotion_label, pad_baseline, is_current, created_at
                 FROM personality_state
-                WHERE user_id = $1 AND created_at >= NOW() - INTERVAL '$2 days'
+                WHERE user_id = $1 AND created_at >= NOW() - make_interval(days => $2)
                 ORDER BY created_at DESC
             """
 
-            rows = await self.db.execute_user_query(user_id, query, (user_id,))
+            rows = await self.db.execute_user_query(user_id, query, (user_id, days))
 
             history = []
             for row in rows:

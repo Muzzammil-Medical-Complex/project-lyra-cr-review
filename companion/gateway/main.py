@@ -202,6 +202,8 @@ async def lifespan(app: FastAPI):
         api_key=settings.embedding_service_api_key.get_secret_value(),
         dimensions=settings.embedding_dimensions
     )
+    # Enable embedding cache
+    services.embedding_client.set_redis_client(services.redis)
 
     # PHASE 3: Core Services (Order matters for dependencies!)
     logger.info("⚙️ Phase 3: Initializing core services...")
@@ -257,8 +259,9 @@ async def lifespan(app: FastAPI):
 
 
 
-    # Initialize scheduler with services
-    services.scheduler = await setup_background_jobs(services)
+    # Bind to the scheduler started by BackgroundServiceManager
+    from .utils.scheduler import get_scheduler
+    services.scheduler = await get_scheduler()
     
     logger.info("✅ All services initialized successfully!")
 

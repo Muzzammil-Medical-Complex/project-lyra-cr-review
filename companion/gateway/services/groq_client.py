@@ -73,9 +73,14 @@ class GroqClient:
             if response.status_code == 200:
                 return response.json()
             else:
+                self.logger.debug(
+                    "Groq API returned %s; body length %d",
+                    response.status_code,
+                    len(response.text or "")
+                )
                 raise ServiceUnavailableError(
                     service_name="Groq",
-                    message=f"API request failed with status {response.status_code}: {response.text}"
+                    message=f"API request failed with status {response.status_code}"
                 )
                 
         except httpx.RequestError as e:
@@ -128,9 +133,14 @@ class GroqClient:
                     wait_time = (2 ** attempt) + random.uniform(0, 1)
                     await asyncio.sleep(wait_time)
                 else:
+                    self.logger.debug(
+                        "Groq API returned %s during backoff; body length %d",
+                        response.status_code,
+                        len(response.text or "")
+                    )
                     raise ServiceUnavailableError(
                         service_name="Groq",
-                        message=f"API request failed with status {response.status_code}: {response.text}"
+                        message=f"API request failed with status {response.status_code}"
                     )
                     
             except httpx.RequestError as e:

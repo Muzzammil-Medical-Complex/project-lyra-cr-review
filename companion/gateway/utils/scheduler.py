@@ -9,7 +9,6 @@ from datetime import datetime, timezone
 from typing import Optional
 import asyncio
 import logging
-import atexit
 
 from ..agents.proactive_manager import ProactiveManager
 from ..agents.reflection import ReflectionAgent
@@ -134,8 +133,8 @@ class SchedulerService:
             report = await reflection_agent.run_nightly_reflection()
             self.logger.info(f"Nightly reflection completed. Processed {len(report.batch_results or [])} batches")
             
-        except Exception as e:
-            self.logger.error(f"Error in nightly reflection: {e}")
+        except Exception:
+            self.logger.exception("Error in nightly reflection")
             # Log error to database as well
             try:
                 await self.services.db.log_background_job_error("nightly_reflection", str(e))
@@ -167,8 +166,13 @@ class SchedulerService:
                     # Check if user was recently sent a proactive message
                     last_proactive = await self.services.db.get_last_proactive_message_time(user_id)
                     now = datetime.now(timezone.utc)
-                    if last_proactive and (now - last_proactive).total_seconds() < cooldown_hours * 3600:
-                        continue
+                    if last_proactive:
+                        if last_proactive.tzinfo is None:
+                            last_proactive = last_proactive.replace(tzinfo=timezone.utc)
+                        else:
+                            last_proactive = last_proactive.astimezone(timezone.utc)
+                        if (now - last_proactive).total_seconds() < cooldown_hours * 3600:
+                            continue
                     
                     if await proactive_manager.should_initiate_conversation(user_id):
                         # Generate and send proactive message
@@ -242,20 +246,21 @@ class SchedulerService:
             
             # Get all active users
             active_users = await self.services.db.get_all_active_users()
-            
+
             decayed_count = 0
             for user_id in active_users:
                 try:
-                    needs = await self.services.db.get_user_needs(user_id)
-                    
+                    # Use personality engine which returns PsychologicalNeed models
+                    needs = await self.services.personality.get_user_needs(user_id)
+
                     for need in needs:
                         # Apply decay rate based on time elapsed
                         hours_since_update = 1  # Assuming hourly job
                         decay_amount = need.decay_rate * hours_since_update
-                        new_level = max(0.0, need.current_level - decay_amount)
-                        
-                        # Update the need level
-                        await self.services.db.update_need_level(user_id, need.need_type, new_level)
+                        # Apply decay as a negative delta via personality engine
+                        await self.services.personality.update_need_level(
+                            user_id, need.need_type, -decay_amount
+                        )
                         decayed_count += 1
                         
                 except Exception as e:

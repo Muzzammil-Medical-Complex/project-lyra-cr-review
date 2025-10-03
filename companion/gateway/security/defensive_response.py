@@ -105,6 +105,7 @@ class DefensiveResponseGenerator:
         dominance = current_pad.get("dominance", 0.0)
         
         # Sanitize quirk names to prevent prompt injection
+        active_quirks = user_personality.get("active_quirks", []) or []
         safe_quirks = []
         for q in active_quirks:
             quirk_name = q.get('name', '')

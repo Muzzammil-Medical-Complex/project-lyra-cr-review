@@ -189,7 +189,7 @@ class MemoryManager:
                     None,
                     self.qdrant.create_collection,
                     collection_name,
-                    VectorParams(size=1536, distance=Distance.COSINE)
+                    VectorParams(size=getattr(self.embeddings, "dimensions", 1536), distance=Distance.COSINE)
                 )
 
                 # Create payload field indexes for efficient filtering
@@ -345,7 +345,7 @@ class MemoryManager:
                             query_vector=query_vector,
                             limit=candidate_count,
                             score_threshold=0.3,
-                            search_params=SearchParams(exact=False)
+                            params=SearchParams(exact=False)
                         )
                     )
                     
@@ -935,7 +935,7 @@ class MemoryManager:
             # Check embedding client availability
             try:
                 # Simple test embedding to verify client is working
-                await self.embedding_client.embed_text("health check test")
+                await self.embeddings.embed_text("health check test")
             except Exception as e:
                 self.logger.exception("Embedding client health check failed")
                 return False

@@ -121,11 +121,18 @@ async def process_message(
             current_state=personality_snapshot.current_pad,
             personality=personality_snapshot
         )
-        
-        # Update personality with new emotional state
+
+        # Calculate delta from current state to new state
+        delta_pad = PADState(
+            pleasure=new_pad_state.pleasure - personality_snapshot.current_pad.pleasure,
+            arousal=new_pad_state.arousal - personality_snapshot.current_pad.arousal,
+            dominance=new_pad_state.dominance - personality_snapshot.current_pad.dominance,
+        )
+
+        # Update personality with PAD delta
         updated_personality = await personality_engine.update_pad_state(
             user_id=request.user_id,
-            delta=new_pad_state
+            delta=delta_pad,
         )
         
         # Prepare context for Letta agent
@@ -443,7 +450,7 @@ async def get_user_capabilities(
             "quirk_tracking": True,
             "needs_monitoring": True,
             "max_message_history": 50,
-            "personality_stability": personality.stability_score if personality else 0.0
+            "personality_stability": getattr(personality, "stability_score", 0.0) if personality else 0.0
         }
         
         return capabilities

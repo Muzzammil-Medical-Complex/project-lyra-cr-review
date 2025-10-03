@@ -4,7 +4,7 @@ Implements the Ortony, Clore, and Collins cognitive appraisal model for calculat
 emotional changes in response to user messages.
 """
 from typing import Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import asyncio
 import logging
 import re
@@ -51,7 +51,7 @@ class AppraisalEngine:
             'neutral': ['ok', 'fine', 'normal', 'usual', 'same']
         }
 
-    def calculate_emotion_delta(self, user_message: str, context: dict) -> PADState:
+    def calculate_emotion_delta(self, user_message: str) -> PADState:
         """
         Calculate emotional change based on user message content and context
         using the OCC cognitive appraisal model
@@ -305,10 +305,10 @@ class AppraisalEngine:
                 )
             else:
                 # If JSON parsing fails, fall back to basic rule-based system
-                return self.calculate_emotion_delta(event, {})
+                return self.calculate_emotion_delta(event)
         except asyncio.TimeoutError:
             self.logger.warning("LLM appraisal timed out, falling back to rule-based")
-            return self.calculate_emotion_delta(event, {})
+            return self.calculate_emotion_delta(event)
         except Exception as e:
             # Log the full traceback for debugging
             self.logger.exception("AI-enhanced appraisal failed. Falling back to basic appraisal.")
@@ -413,9 +413,9 @@ class AppraisalEngine:
         Perform a complete appraisal of an interaction using the OCC model
         """
         appraisal_result = {
-            'timestamp': datetime.utcnow(),
+            'timestamp': datetime.now(timezone.utc),
             'event': interaction.user_message,
-            'basic_appraisal': self.calculate_emotion_delta(interaction.user_message, {}),
+            'basic_appraisal': self.calculate_emotion_delta(interaction.user_message),
             'goal_relevance': await self.assess_goal_relevance(interaction.user_message, personality),
             'appraisal_components': self._calculate_appraisal_components(interaction.user_message, personality),
             'predicted_emotional_response': await self.calculate_emotional_response(interaction.user_message, personality),

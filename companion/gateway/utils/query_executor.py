@@ -47,11 +47,15 @@ class QueryExecutor:
                 return False
 
             # Check each statement (handles multi-statement queries)
+            has_statement = False
             for statement in parsed:
-                if QueryExecutor._check_user_id_in_statement(statement):
-                    return True
+                if statement.token_first(skip_cm=True, skip_ws=True) is None:
+                    continue  # skip empty statements
+                has_statement = True
+                if not QueryExecutor._check_user_id_in_statement(statement):
+                    return False
 
-            return False
+            return has_statement
         except Exception as e:
             logger.error(f"Error parsing SQL for validation: {e}")
             return False

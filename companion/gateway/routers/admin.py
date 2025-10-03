@@ -105,8 +105,8 @@ async def get_system_stats(
 async def get_security_incidents(
     limit: int = Query(50, ge=1, le=1000),
     offset: int = Query(0, ge=0),
-    severity: Optional[str] = Query(None, regex="^(low|medium|high|critical)$"),
-    status: Optional[str] = Query(None, regex="^(detected|investigating|resolved|ignored)$"),
+    severity: Optional[str] = Query(None, pattern="^(low|medium|high|critical)$"),
+    status: Optional[str] = Query(None, pattern="^(detected|investigating|resolved|ignored)$"),
     user_service: UserService = Depends(get_users)
 ):
     """
@@ -129,7 +129,7 @@ async def get_security_incidents(
 
 @router.post("/cleanup", response_model=Dict[str, Any])
 async def run_system_cleanup(
-    cleanup_type: str = Query(..., regex="^(memories|users|logs|all)$"),
+    cleanup_type: str = Query(..., pattern="^(memories|users|logs|all)$"),
     user_service: UserService = Depends(get_users),
     memory_manager: MemoryManager = Depends(get_memory),
     db: DatabaseManager = Depends(get_db)
@@ -213,7 +213,7 @@ async def migrate_user_memories(
 @router.put("/users/{user_id}/status", response_model=UserProfile)
 async def update_user_status(
     user_id: str,
-    status: str = Query(..., regex="^(active|inactive|suspended|deleted)$"),
+    status: str = Query(..., pattern="^(active|inactive|suspended|deleted)$"),
     reason: Optional[str] = Query(None),
     user_service: UserService = Depends(get_users)
 ):
@@ -270,43 +270,45 @@ async def get_scheduler_status():
 @router.post("/scheduler/{job_id}/control", response_model=Dict[str, str])
 async def control_scheduler_job(
     job_id: str,
-    action: str = Query(..., regex="^(pause|resume|trigger)$")
+    action: str = Query(..., pattern="^(pause|resume|trigger)$")
 ):
     """
     Control a specific scheduled job.
     Actions: pause, resume, or trigger immediately.
     """
     try:
-        # scheduler = await get_scheduler()
-        # if not scheduler:
-        #     raise HTTPException(status_code=500, detail="Scheduler not initialized")
-        
-        # job = scheduler.scheduler.get_job(job_id)
-        # if not job:
-        #     raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
-        
-        # if action == "pause":
-        #     await scheduler.pause_job(job_id)
-        #     message = f"Job {job_id} paused"
-        # elif action == "resume":
-        #     await scheduler.resume_job(job_id)
-        #     message = f"Job {job_id} resumed"
-        # elif action == "trigger":
-        #     # Trigger the job immediately
-        #     job.func()
-        #     message = f"Job {job_id} triggered immediately"
-        # else:
-        #     raise HTTPException(status_code=400, detail=f"Invalid action: {action}")
-        
-        message = f"Action {action} on job {job_id} would be executed"
-        
+        from ..utils.scheduler import get_scheduler
+        from datetime import timezone
+
+        scheduler = get_scheduler()
+        if not scheduler:
+            raise HTTPException(status_code=500, detail="Scheduler not initialized")
+
+        job = scheduler.scheduler.get_job(job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+
+        if action == "pause":
+            await scheduler.pause_job(job_id)
+            message = f"Job {job_id} paused"
+        elif action == "resume":
+            await scheduler.resume_job(job_id)
+            message = f"Job {job_id} resumed"
+        elif action == "trigger":
+            # Schedule immediate run by setting next_run_time to now
+            job.modify(next_run_time=datetime.now(timezone.utc))
+            scheduler.scheduler.wakeup()
+            message = f"Job {job_id} triggered immediately"
+        else:
+            raise HTTPException(status_code=400, detail=f"Invalid action: {action}")
+
         logger.info(message)
-        
+
         return {
             "message": message,
             "job_id": job_id,
             "action": action,
-            "timestamp": datetime.utcnow()
+            "timestamp": datetime.now(timezone.utc)
         }
     except HTTPException:
         raise
